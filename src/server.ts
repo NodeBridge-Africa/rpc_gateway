@@ -6,7 +6,13 @@ import { validateEnv } from "./config/env.example";
 import database from "./config/database";
 import authRoutes from "./routes/auth.routes";
 import proxyRoutes from "./routes/proxy.routes";
-import { metricsMiddleware, getMetrics } from "./services/metrics.service";
+import adminRoutes from "./routes/admin.routes";
+import {
+  metricsMiddleware,
+  getMetrics,
+  startMetricsCollection,
+  stopMetricsCollection,
+} from "./services/metrics.service";
 
 async function startServer() {
   try {
@@ -65,6 +71,8 @@ async function startServer() {
           monitoring: {
             health: "GET /health",
             metrics: "GET /metrics",
+            nodeHealth: "GET /admin/node-health",
+            nodeMetrics: "GET /admin/node-metrics",
           },
         },
         documentation: "https://github.com/your-repo/nodebridge-rpc-gateway",
@@ -100,6 +108,7 @@ async function startServer() {
 
     // Routes
     app.use("/auth", authRoutes);
+    app.use("/admin", adminRoutes);
     app.use("/", proxyRoutes); // Proxy routes handle /exec and /cons
 
     // Metrics endpoint for Prometheus
@@ -143,6 +152,9 @@ async function startServer() {
       console.log(`📊 Metrics available at http://localhost:${PORT}/metrics`);
       console.log(`💚 Health check at http://localhost:${PORT}/health`);
       console.log(`📖 API docs at http://localhost:${PORT}/`);
+
+      // Start Ethereum node metrics collection
+      startMetricsCollection();
     });
 
     // Graceful shutdown
@@ -153,6 +165,9 @@ async function startServer() {
         console.log("HTTP server closed");
 
         try {
+          // Stop metrics collection
+          stopMetricsCollection();
+
           await database.disconnect();
           console.log("Database connection closed");
           process.exit(0);

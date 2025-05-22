@@ -13,4 +13,7 @@ if (error) throw new Error(`Config validation error: ${error.message}`);
 export const config: ConfigTypes = {
   PORT: envVariables.PORT,
   JWT_SECRET: envVariables.JWT_SECRET,
+  PROMETHEUS_URL: envVariables.PROMETHEUS_URL,
+  EXECUTION_RPC_URL: envVariables.EXECUTION_RPC_URL,
+  CONSENSUS_API_URL: envVariables.CONSENSUS_API_URL,
 };

@@ -7,6 +7,7 @@ import {
   metricsMiddleware,
   getMetrics,
 } from "../../src/services/metrics.service";
+import prom from "prom-client";
 
 // Create test app without database connection
 export function createTestApp() {
@@ -60,6 +61,8 @@ export function createTestApp() {
 
   // Metrics endpoint
   app.get("/metrics", getMetrics);
+
+  // Note: Default metrics are already collected by the metrics service
 
   // 404 handler
   app.use("*", (req, res) => {
