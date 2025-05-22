@@ -341,8 +341,8 @@ NodeBridge is open source. For commercial support, contact the maintainers throu
 ## 🔍 **Still have questions?**
 
 - 📖 Check the [full documentation](Home)
-- 💬 Start a [GitHub Discussion](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/discussions)
-- 🐛 Report issues on [GitHub](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/issues)
+- 💬 Start a [GitHub Discussion](https://github.com/NodeBridge-Africa/rpc_gateway/discussions)
+- 🐛 Report issues on [GitHub](https://github.com/NodeBridge-Africa/rpc_gateway/issues)
 - 📧 Email: support@nodebridge.dev
 
 **💡 Tip**: Use the search function in this wiki to quickly find information about specific topics!

@@ -94,9 +94,9 @@ NodeBridge RPC Gateway is a **production-ready**, multi-tenant RPC gateway that 
 
 ## 🤝 **Community & Support**
 
-- **GitHub Repository**: [nodebridge_rpc_backend](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend)
-- **Issues**: [Report bugs or request features](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/issues)
-- **Discussions**: [Community discussions](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/discussions)
+- **GitHub Repository**: [rpc_gateway](https://github.com/NodeBridge-Africa/rpc_gateway)
+- **Issues**: [Report bugs or request features](https://github.com/NodeBridge-Africa/rpc_gateway/issues)
+- **Discussions**: [Community discussions](https://github.com/NodeBridge-Africa/rpc_gateway/discussions)
 - **Wiki**: You're here! 📍
 
 ## 📝 **Latest Updates**
@@ -115,6 +115,6 @@ Check the [Changelog](Changelog) for the latest features, bug fixes, and improve
 
 ---
 
-**📋 Wiki Navigation**: Use the sidebar or the links above to navigate through the documentation. If you can't find what you're looking for, try the search function or [ask a question](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/discussions).
+**📋 Wiki Navigation**: Use the sidebar or the links above to navigate through the documentation. If you can't find what you're looking for, try the search function or [ask a question](https://github.com/NodeBridge-Africa/rpc_gateway/discussions).
 
 **🔄 Keep Updated**: This wiki is actively maintained. Star the repository to stay updated with the latest changes!

@@ -84,8 +84,8 @@ A **production-ready**, multi-tenant RPC gateway providing controlled access to 
 
 ```bash
 # Clone the repository
-git clone https://github.com/NodeBridge-Africa/nodebridge_rpc_backend.git
-cd nodebridge_rpc_backend
+git clone https://github.com/NodeBridge-Africa/rpc_gateway.git
+cd rpc_gateway
 
 # Install dependencies
 yarn install
@@ -634,7 +634,7 @@ export JWT_SECRET="$(openssl rand -hex 64)"
 ### Project Structure
 
 ```
-nodebridge_rpc_backend/
+rpc_gateway/
 ├── src/                          # Source code
 │   ├── config/                   # Configuration files
 │   ├── middlewares/              # Express middlewares
@@ -684,7 +684,7 @@ nodebridge_rpc_backend/
 
    ```bash
    git clone <repository>
-   cd nodebridge_rpc_backend
+   cd rpc_gateway
    yarn install
    cp .env.example .env
    # Edit .env with your settings
@@ -721,8 +721,8 @@ We welcome contributions! Please read our contribution guidelines below.
 
    ```bash
    # Click "Fork" on GitHub, then clone your fork
-   git clone https://github.com/YOUR-USERNAME/nodebridge_rpc_backend.git
-   cd nodebridge_rpc_backend
+   git clone https://github.com/YOUR-USERNAME/rpc_gateway.git
+   cd rpc_gateway
    ```
 
 2. **Set Up Development Environment**
@@ -1033,9 +1033,9 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **⭐ Star this repository if you find it useful!**
 
-[Report Bug](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/issues) •
-[Request Feature](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/discussions) •
-[Documentation](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/wiki) •
+[Report Bug](.github/ISSUE_TEMPLATE/bug_report.md) •
+[Request Feature](.github/ISSUE_TEMPLATE/feature_request.md) •
+[Documentation](https://github.com/NodeBridge-Africa/rpc_gateway/wiki/Home.md) •
 [Contribute](CONTRIBUTING.md)
 
 Made with ❤️ by [Kc Pele](https://github.com/KcPele), for Nodebridge
