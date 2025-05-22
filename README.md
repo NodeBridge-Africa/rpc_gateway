@@ -84,7 +84,7 @@ A **production-ready**, multi-tenant RPC gateway providing controlled access to 
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/nodebridge_rpc_backend.git
+git clone https://github.com/NodeBridge-Africa/nodebridge_rpc_backend.git
 cd nodebridge_rpc_backend
 
 # Install dependencies
@@ -1033,11 +1033,11 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **⭐ Star this repository if you find it useful!**
 
-[Report Bug](https://github.com/your-org/nodebridge_rpc_backend/issues) •
-[Request Feature](https://github.com/your-org/nodebridge_rpc_backend/discussions) •
-[Documentation](https://github.com/your-org/nodebridge_rpc_backend/wiki) •
+[Report Bug](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/issues) •
+[Request Feature](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/discussions) •
+[Documentation](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/wiki) •
 [Contribute](CONTRIBUTING.md)
 
-Made with ❤️ by developers, for developers
+Made with ❤️ by [Kc Pele](https://github/KcPele), for Nodebridge
 
 </div>

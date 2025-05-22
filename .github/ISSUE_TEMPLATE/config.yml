@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Start a Discussion
+    url: https://github.com/kcpele/nodebridge_rpc_backend/discussions
+    about: Ask questions, share ideas, or discuss general topics about NodeBridge
+  - name: 📖 Documentation
+    url: https://github.com/kcpele/nodebridge_rpc_backend/wiki
+    about: Read the comprehensive documentation and guides
+  - name: 🔒 Security Issue
+    url: mailto:security@nodebridge.dev
+    about: Report security vulnerabilities privately
