@@ -1038,6 +1038,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 [Documentation](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/wiki) •
 [Contribute](CONTRIBUTING.md)
 
-Made with ❤️ by [Kc Pele](https://github/KcPele), for Nodebridge
+Made with ❤️ by [Kc Pele](https://github.com/KcPele), for Nodebridge
 
 </div>

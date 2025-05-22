@@ -15,7 +15,7 @@ Before starting, ensure you have:
 
 ```bash
 # Clone the repository
-git clone https://github.com/kcpele/nodebridge_rpc_backend.git
+git clone https://github.com/NodeBridge-Africa/nodebridge_rpc_backend.git
 cd nodebridge_rpc_backend
 
 # Install dependencies
@@ -279,8 +279,8 @@ curl -X POST http://localhost:8545 \
 ### Need Help?
 
 - 📖 Check the [Troubleshooting Guide](Troubleshooting)
-- 💬 Start a [Discussion](https://github.com/kcpele/nodebridge_rpc_backend/discussions)
-- 🐛 Report issues on [GitHub](https://github.com/kcpele/nodebridge_rpc_backend/issues)
+- 💬 Start a [Discussion](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/discussions)
+- 🐛 Report issues on [GitHub](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/issues)
 
 ---
 

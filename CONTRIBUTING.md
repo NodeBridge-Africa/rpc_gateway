@@ -33,7 +33,7 @@ git clone https://github.com/YOUR-USERNAME/nodebridge_rpc_backend.git
 cd nodebridge_rpc_backend
 
 # Add upstream remote
-git remote add upstream https://github.com/kcpele/nodebridge_rpc_backend.git
+git remote add upstream https://github.com/NodeBridge-Africa/nodebridge_rpc_backend.git
 
 # Install dependencies
 yarn install
@@ -359,7 +359,7 @@ For security vulnerabilities:
 
 - **Do NOT** create public issues
 - **Email**: security@nodebridge.dev
-- **Use**: [Security advisory](https://github.com/kcpele/nodebridge_rpc_backend/security/advisories)
+- **Use**: [Security advisory](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/security/advisories)
 - **Include**: Detailed description and reproduction steps
 
 ## 📄 License
@@ -376,4 +376,4 @@ Every contribution, no matter how small, helps make NodeBridge better for everyo
 
 ---
 
-For more detailed information, check out our [Wiki](https://github.com/kcpele/nodebridge_rpc_backend/wiki) and [API Documentation](README.md#api-documentation).
+For more detailed information, check out our [Wiki](https://github.com/NodeBridge-Africa/nodebridge_rpc_backend/wiki) and [API Documentation](README.md#api-documentation).
