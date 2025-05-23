@@ -16,7 +16,8 @@
     "test:integration": "jest --testPathPattern='tests/integration\\.test\\.ts$'",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
-    "setup": "node scripts/setup.js"
+    "setup": "node scripts/setup.js",
+    "create-test-key": "ts-node scripts/create-test-apikey.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.22.11",
