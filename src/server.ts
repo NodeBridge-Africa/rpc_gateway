@@ -146,8 +146,8 @@ async function startServer() {
     });
 
     // Start server
-    const PORT = process.env.PORT || 8888;
-    const server = app.listen(PORT, () => {
+    const PORT = Number(process.env.PORT) || 8888;
+    const server = app.listen(PORT, process.env.HOST || "0.0.0.0", () => {
       console.log(`🚀 NodeBridge RPC Gateway running on port ${PORT}`);
       console.log(`📊 Metrics available at http://localhost:${PORT}/metrics`);
       console.log(`💚 Health check at http://localhost:${PORT}/health`);
