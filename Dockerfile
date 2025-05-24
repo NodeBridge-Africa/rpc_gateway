@@ -10,4 +10,4 @@ RUN yarn transpile
 
 CMD ["node", "dist/server.js"]
 # port to run the app
-EXPOSE 5000
+EXPOSE 8888
