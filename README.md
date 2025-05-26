@@ -36,12 +36,12 @@ A **production-ready**, multi-tenant RPC gateway providing controlled access to 
 - Error rate monitoring
 - Usage analytics
 
-### 🌐 **Dual Layer Support**
+### ⛓️ **Flexible Multi-Chain Support**
 
-- **Execution Layer**: Full JSON-RPC compatibility
-- **Consensus Layer**: Beacon API support
-- Automatic request routing
-- Path rewriting & parameter handling
+- Configure and connect to multiple Ethereum-compatible chains (e.g., Ethereum Mainnet, Sepolia, custom chains) by defining environment variables with a unique prefix for each chain.
+- For example, `ETHEREUM_EXECUTION_RPC_URL` and `SEPOLIA_EXECUTION_RPC_URL` define two distinct chains.
+- The prefix (e.g., `ETHEREUM`, `SEPOLIA`), converted to lowercase, is used as the chain identifier in API paths (e.g., `/ethereum/exec/...`, `/sepolia/cons/...`).
+- Supports both Execution Layer (JSON-RPC) and Consensus Layer (Beacon API) for each configured chain, along with optional chain-specific Prometheus URLs.
 
 ### 🛡️ **Production Security**
 
@@ -101,7 +101,7 @@ yarn build
 cp .env.example .env
 ```
 
-Update `.env` with your configuration:
+Update `.env` with your configuration. To configure chains, use environment variables prefixed with the chain's name (e.g., `ETHEREUM_`, `SEPOLIA_`). The supported suffixes are `_EXECUTION_RPC_URL`, `_CONSENSUS_API_URL`, and `_PROMETHEUS_URL` (optional).
 
 ```env
 # Server Configuration
@@ -114,17 +114,31 @@ MONGO_URI=mongodb://localhost:27017/nodebridge
 # Security
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 
-# Ethereum Node Endpoints
-EXECUTION_RPC_URL=http://localhost:8545
-CONSENSUS_API_URL=http://localhost:5052
-
-# Prometheus Monitoring (Optional)
-PROMETHEUS_URL=http://localhost:9090
-
 # Rate Limiting Defaults
 DEFAULT_MAX_RPS=20
 DEFAULT_DAILY_REQUESTS=10000
+
+# --- Dynamic Multi-Chain Configuration ---
+# Define each chain by prefixing variables with its name (e.g., ETHEREUM, SEPOLIA).
+# The prefix (lowercase) will be used as the chain identifier in API paths.
+
+# Example: Ethereum Mainnet
+ETHEREUM_EXECUTION_RPC_URL=http://localhost:8545
+ETHEREUM_CONSENSUS_API_URL=http://localhost:5052
+# ETHEREUM_PROMETHEUS_URL=http://localhost:9091 # Optional
+
+# Example: Sepolia Testnet (using a public provider)
+SEPOLIA_EXECUTION_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
+SEPOLIA_CONSENSUS_API_URL=https://sepolia-beacon.infura.io/v3/YOUR_INFURA_PROJECT_ID
+# SEPOLIA_PROMETHEUS_URL= # Optional
+
+# Example: Holesky Testnet (Execution layer only)
+HOLESKY_EXECUTION_RPC_URL=https://rpc.holesky.ethpandaops.io
+# HOLESKY_CONSENSUS_API_URL= # Optional
+
+# Add more chains by following the pattern: YOURCHAINNAME_EXECUTION_RPC_URL=...
 ```
+Refer to `src/config/env.example.ts` for more detailed examples and explanations.
 
 ### 3. Database Setup
 
@@ -223,8 +237,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 Access standard Ethereum JSON-RPC methods:
 
+The `:chain` parameter in the URL (e.g., `ethereum`, `sepolia`) corresponds to the lowercase version of the prefix used when defining the chain in your environment variables (e.g., `ETHEREUM_EXECUTION_RPC_URL` means the path `/ethereum/exec/...`).
+
 ```bash
-POST /exec/<YOUR_API_KEY>
+POST /:chain/exec/<YOUR_API_KEY>
 Content-Type: application/json
 
 {
@@ -249,10 +265,12 @@ Content-Type: application/json
 
 Access Ethereum consensus layer data:
 
+The `:chain` parameter in the URL (e.g., `ethereum`, `sepolia`) corresponds to the lowercase version of the prefix used when defining the chain in your environment variables (e.g., `SEPOLIA_CONSENSUS_API_URL` means the path `/sepolia/cons/...`).
+
 ```bash
-GET /cons/<YOUR_API_KEY>/eth/v1/beacon/headers
-GET /cons/<YOUR_API_KEY>/eth/v1/beacon/blocks/head
-GET /cons/<YOUR_API_KEY>/eth/v1/node/syncing
+GET /:chain/cons/<YOUR_API_KEY>/eth/v1/beacon/headers
+GET /:chain/cons/<YOUR_API_KEY>/eth/v1/beacon/blocks/head
+GET /:chain/cons/<YOUR_API_KEY>/eth/v1/node/syncing
 ```
 
 ### 📊 Monitoring Endpoints
@@ -291,7 +309,7 @@ Returns Prometheus-formatted metrics including:
 #### Admin: Node Health
 
 ```bash
-GET /admin/node-health
+GET /admin/node-health/:chain
 ```
 
 **Response:**
@@ -317,7 +335,7 @@ GET /admin/node-health
 #### Admin: Node Metrics
 
 ```bash
-GET /admin/node-metrics
+GET /admin/node-metrics/:chain
 ```
 
 ## 💻 Usage Examples
@@ -328,7 +346,7 @@ GET /admin/node-metrics
 const Web3 = require("web3");
 
 // Initialize with your NodeBridge gateway
-const web3 = new Web3("http://localhost:8888/exec/YOUR-API-KEY");
+const web3 = new Web3("http://localhost:8888/ethereum/exec/YOUR-API-KEY");
 
 async function example() {
   // Get latest block number
@@ -349,7 +367,7 @@ async function example() {
 const { JsonRpcProvider } = require("ethers");
 
 // Initialize provider
-const provider = new JsonRpcProvider("http://localhost:8888/exec/YOUR-API-KEY");
+const provider = new JsonRpcProvider("http://localhost:8888/ethereum/exec/YOUR-API-KEY");
 
 async function example() {
   // Get network information
@@ -366,12 +384,12 @@ async function example() {
 
 ```bash
 # Get latest block number
-curl -X POST http://localhost:8888/exec/YOUR-API-KEY \
+curl -X POST http://localhost:8888/ethereum/exec/YOUR-API-KEY \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
 # Get consensus layer sync status
-curl http://localhost:8888/cons/YOUR-API-KEY/eth/v1/node/syncing
+curl http://localhost:8888/ethereum/cons/YOUR-API-KEY/eth/v1/node/syncing
 
 # Check gateway health
 curl http://localhost:8888/health
@@ -672,11 +690,12 @@ rpc_gateway/
 | `NODE_ENV`               | Environment                  | `development`                          | No       |
 | `MONGO_URI`              | MongoDB connection           | `mongodb://localhost:27017/nodebridge` | Yes      |
 | `JWT_SECRET`             | JWT signing secret           | -                                      | Yes      |
-| `EXECUTION_RPC_URL`      | Ethereum execution node      | `http://localhost:8545`                | Yes      |
-| `CONSENSUS_API_URL`      | Ethereum consensus node      | `http://localhost:5052`                | Yes      |
-| `PROMETHEUS_URL`         | Prometheus metrics endpoint  | -                                      | No       |
+| `CHAINNAME_EXECUTION_RPC_URL` | RPC URL for 'CHAINNAME' execution layer. Replace `CHAINNAME` with chain ID (e.g., `ETHEREUM`). | -       | Yes (for each configured chain) |
+| `CHAINNAME_CONSENSUS_API_URL` | Beacon API URL for 'CHAINNAME' consensus layer. Replace `CHAINNAME` as above.            | -       | No (Optional, per chain) |
+| `CHAINNAME_PROMETHEUS_URL`    | Prometheus URL for 'CHAINNAME' specific metrics. Replace `CHAINNAME` as above.           | -       | No (Optional, per chain) |
 | `DEFAULT_MAX_RPS`        | Rate limit (requests/second) | `20`                                   | No       |
 | `DEFAULT_DAILY_REQUESTS` | Daily request limit          | `10000`                                | No       |
+| `ENABLE_METRICS`         | Enable gateway's Prometheus metrics endpoint (`/metrics`) | `true`    | No       |
 
 ### Development Workflow
 

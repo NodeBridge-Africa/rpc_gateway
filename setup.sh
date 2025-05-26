@@ -69,16 +69,32 @@ JWT_SECRET=$(openssl rand -base64 32)
 PORT=8888
 NODE_ENV=development
 
-# Sepolia Node Endpoints (local)
-EXECUTION_RPC_URL=http://127.0.0.1:8545
-CONSENSUS_API_URL=http://127.0.0.1:5052
+# Metrics
+ENABLE_METRICS=true
 
-# Rate Limiting (default values)
+# Default Rate Limiting (for new users)
 DEFAULT_MAX_RPS=20
 DEFAULT_DAILY_REQUESTS=10000
 
-# Metrics
-ENABLE_METRICS=true
+# ------------------------------------------------------------------------------------
+# DYNAMIC MULTI-CHAIN CONFIGURATION
+# ------------------------------------------------------------------------------------
+# Define configurations for each blockchain by prefixing variables with a chain name
+# (e.g., ETHEREUM_, SEPOLIA_). The prefix (lowercase) is used in API routes.
+# Supported suffixes: _EXECUTION_RPC_URL, _CONSENSUS_API_URL, _PROMETHEUS_URL (optional)
+
+# Example: Ethereum Mainnet (uncomment and update with your actual URLs if needed)
+# ETHEREUM_EXECUTION_RPC_URL=http://127.0.0.1:8545
+# ETHEREUM_CONSENSUS_API_URL=http://127.0.0.1:5052
+# ETHEREUM_PROMETHEUS_URL=http://127.0.0.1:9091
+
+# Example: Sepolia Testnet (defaulted to local, update if using public provider)
+SEPOLIA_EXECUTION_RPC_URL=http://127.0.0.1:8546
+SEPOLIA_CONSENSUS_API_URL=http://127.0.0.1:5053
+# For public providers, comment lines above and uncomment below:
+# SEPOLIA_EXECUTION_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
+# SEPOLIA_CONSENSUS_API_URL=https://sepolia-beacon.infura.io/v3/YOUR_INFURA_PROJECT_ID
+# SEPOLIA_PROMETHEUS_URL=
 EOF
     print_status ".env file created with secure JWT secret ✓"
 else
@@ -147,8 +163,8 @@ echo ""
 print_status "Setup complete! 🎉"
 echo ""
 echo "Next steps:"
-echo "1. Edit .env file and update MONGO_URI password if needed"
-echo "2. Ensure your Sepolia node is running on ports 8545 and 5052"
+echo "1. Review .env: ensure MONGO_URI matches your MongoDB setup. The script attempts to create a user 'rpcadmin' with password 'STRONG_DB_PASSWORD'."
+echo "2. Edit the .env file to uncomment and configure your desired blockchain RPC URLs (e.g., ETHEREUM_EXECUTION_RPC_URL, SEPOLIA_CONSENSUS_API_URL)."
 echo "3. Start the gateway:"
 echo "   Development: yarn dev"
 echo "   Production:  yarn start"

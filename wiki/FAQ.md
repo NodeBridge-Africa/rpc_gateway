@@ -68,7 +68,7 @@ No, NodeBridge is a gateway/proxy service that requires backend Ethereum nodes (
 
 1. Users register via `/auth/register`
 2. System generates a unique UUID API key
-3. API key is used in RPC endpoint URLs: `/exec/<API_KEY>`
+3. API key is used in RPC endpoint URLs: `/:chain/exec/<API_KEY>` (e.g., `/ethereum/exec/<API_KEY>`)
 4. Each request is tracked and rate-limited per API key
 
 ### Can I regenerate API keys?
@@ -165,21 +165,23 @@ Metrics collection is built-in and cannot be completely disabled, but you can:
 
 ### Can I use NodeBridge with Web3.js?
 
-Yes! Simply point Web3.js to your NodeBridge endpoint:
+Yes! Simply point Web3.js to your NodeBridge endpoint, specifying the chain:
 
 ```javascript
 const Web3 = require("web3");
-const web3 = new Web3("http://your-gateway:8888/exec/YOUR_API_KEY");
+const web3 = new Web3("http://your-gateway:8888/ethereum/exec/YOUR_API_KEY");
+// Or for other chains: "http://your-gateway:8888/arbitrum/exec/YOUR_API_KEY"
 ```
 
 ### Can I use NodeBridge with Ethers.js?
 
-Yes! Configure Ethers.js provider:
+Yes! Configure Ethers.js provider, specifying the chain:
 
 ```javascript
 const { JsonRpcProvider } = require("ethers");
 const provider = new JsonRpcProvider(
-  "http://your-gateway:8888/exec/YOUR_API_KEY"
+  "http://your-gateway:8888/ethereum/exec/YOUR_API_KEY"
+  // Or for other chains: "http://your-gateway:8888/arbitrum/exec/YOUR_API_KEY"
 );
 ```
 
@@ -271,7 +273,7 @@ DEBUG=nodebridge:*
 
 ### Performance is slow, what should I check?
 
-1. **Node health**: Check `/admin/node-health`
+1. **Node health**: Check `/admin/node-health/:chain` (e.g., `/admin/node-health/ethereum`)
 2. **Database performance**: Monitor MongoDB metrics
 3. **Rate limiting**: Check if you're hitting limits
 4. **Network latency**: Test direct node connection
