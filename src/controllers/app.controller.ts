@@ -7,9 +7,16 @@ import { successResponse, errorResponse } from '../utils/responseHandler'; // As
 import { v4 as uuid } from 'uuid'; // For API key generation if not handled by schema default
 
 const MAX_APPS_PER_USER = 5;
-// const DEFAULT_MAX_RPS = parseInt(process.env.DEFAULT_MAX_RPS || "20"); // This might be removed or used only for fallback
+// const DEFAULT_MAX_RPS = parseInt(process.env.DEFAULT_MAX_RPS || "20"); // This is now sourced from DefaultAppSettings
 
 export class AppController {
+  /**
+   * Creates a new application for an authenticated user.
+   * The application's initial rate limits (maxRps, dailyRequestsLimit) are sourced
+   * from the global DefaultAppSettings.
+   * @param req Express request object, expects { name, description?, chainName, chainId } in body.
+   * @param res Express response object.
+   */
   public async createApp(req: Request, res: Response): Promise<void> {
     try {
       const { name, description, chainName, chainId } = req.body;
@@ -39,7 +46,7 @@ export class AppController {
         return;
       }
 
-      // Fetch default app settings
+      // Fetch default app settings to apply to the new app.
       let appMaxRps: number;
       let appDailyRequestsLimit: number;
 
@@ -48,11 +55,13 @@ export class AppController {
         appMaxRps = defaultSettings.defaultMaxRps;
         appDailyRequestsLimit = defaultSettings.defaultDailyRequestsLimit;
       } else {
-        // Fallback if no default settings are configured by admin
-        // This case should be rare now that getDefaultAppSettings creates initial settings.
+        // Fallback logic: If no DefaultAppSettings document exists in the database,
+        // use hardcoded or environment-variable-based fallbacks.
+        // This situation should be unlikely if the DefaultAppSettingsController.getDefaultAppSettings
+        // endpoint has been called at least once, as it creates initial settings.
         console.warn('DefaultAppSettings not found. Falling back to environment/hardcoded defaults for new app.');
-        appMaxRps = parseInt(process.env.FALLBACK_DEFAULT_MAX_RPS || '20'); // Or a new env var for fallback
-        appDailyRequestsLimit = parseInt(process.env.FALLBACK_DEFAULT_DAILY_LIMIT || '10000'); // Or a new env var for fallback
+        appMaxRps = parseInt(process.env.FALLBACK_DEFAULT_MAX_RPS || '20'); 
+        appDailyRequestsLimit = parseInt(process.env.FALLBACK_DEFAULT_DAILY_LIMIT || '10000');
       }
 
       const newApp = new App({
@@ -76,7 +85,12 @@ export class AppController {
     }
   }
 
-  // ... getUserApps method remains the same ...
+  /**
+   * Retrieves all applications belonging to the authenticated user.
+   * API keys are excluded from the response for security.
+   * @param req Express request object, expects authenticated user via req.user.
+   * @param res Express response object.
+   */
   public async getUserApps(req: Request, res: Response): Promise<void> {
     try {
         const userId = (req.user as IUser)?._id;

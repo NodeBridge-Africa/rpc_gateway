@@ -1,7 +1,13 @@
 import { Schema, model, Document } from 'mongoose';
 
+/**
+ * Defines the structure for default application settings,
+ * which are used as global defaults when new applications are created.
+ */
 export interface IDefaultAppSettings extends Document {
+  /** Default maximum requests per second for new apps. */
   defaultMaxRps: number;
+  /** Default maximum daily requests limit for new apps. */
   defaultDailyRequestsLimit: number;
   createdAt: Date;
   updatedAt: Date;
@@ -9,8 +15,16 @@ export interface IDefaultAppSettings extends Document {
 
 const DefaultAppSettingsSchema = new Schema<IDefaultAppSettings>(
   {
-    defaultMaxRps: { type: Number, required: true },
-    defaultDailyRequestsLimit: { type: Number, required: true },
+    defaultMaxRps: { 
+      type: Number, 
+      required: true,
+      /** Default maximum requests per second for new apps. */
+    },
+    defaultDailyRequestsLimit: { 
+      type: Number, 
+      required: true,
+      /** Default maximum daily requests limit for new apps. */
+    },
   },
   {
     timestamps: true,

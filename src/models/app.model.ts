@@ -9,9 +9,10 @@ export interface IApp extends Document {
   apiKey: string;
   chainName: string;
   chainId: string;
-  /** Max requests per second */
+  /** Max requests per second allowed for this app. */
   maxRps: number;
-  dailyRequestsLimit: number; // New field
+  /** The maximum number of requests the app can make per day. */
+  dailyRequestsLimit: number;
   requests: number;
   dailyRequests: number;
   lastResetDate: Date;
@@ -41,13 +42,14 @@ const AppSchema = new Schema<IApp>(
     maxRps: {
       type: Number,
       required: true,
-      /** Max requests per second */
-      // Default will now come from DefaultAppSettings during app creation, not from schema default
+      /** Max requests per second allowed for this app. */
+      // Default value is sourced from DefaultAppSettings during app creation.
     },
     dailyRequestsLimit: {
       type: Number,
       required: true,
-      // Default will now come from DefaultAppSettings during app creation
+      /** The maximum number of requests the app can make per day. */
+      // Default value is sourced from DefaultAppSettings during app creation.
     },
     requests: { type: Number, default: 0, min: 0 },
     dailyRequests: { type: Number, default: 0, min: 0 },

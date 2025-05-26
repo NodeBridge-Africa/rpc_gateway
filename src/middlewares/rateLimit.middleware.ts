@@ -14,6 +14,22 @@ type ApiKeyRequest = Request & {
 // In-memory store for rate limiting buckets
 const buckets: Record<string, RateLimitBucket> = {};
 
+/**
+ * Express middleware for dynamic rate limiting based on the application's `maxRps` setting.
+ * It uses a token bucket algorithm to control the request rate.
+ * 1. Retrieves the `app` object attached to the request (expected to be set by `apiKeyGuard`).
+ * 2. If no `app` is found, it skips rate limiting (assuming another middleware handles authentication).
+ * 3. Uses the `app.apiKey` as a unique key for the rate limit bucket.
+ * 4. Retrieves or creates a token bucket for the app, using `app.maxRps`.
+ * 5. Refills tokens based on elapsed time and `app.maxRps`.
+ * 6. If tokens are available, consumes one and sets rate limit headers (`X-RateLimit-Limit`, 
+ *    `X-RateLimit-Remaining`, `X-RateLimit-Reset`).
+ * 7. If no tokens are available, rejects the request with a 429 status code.
+ * 
+ * @param req {ApiKeyRequest} Express request object, augmented with `app` property.
+ * @param res {Response} Express response object.
+ * @param next {NextFunction} Express next middleware function.
+ */
 export const dynamicRateLimit = (
   req: ApiKeyRequest, // This type is now updated
   res: Response,
@@ -22,7 +38,7 @@ export const dynamicRateLimit = (
   const app = req.app; // Get the app object from the request
 
   if (!app) {
-    // No app found on request (e.g., if apiKeyGuard did not run or did not find an app)
+    // No app found on request (e.g., if apiKeyGuard did not run or did not find an app).
     // Depending on desired behavior, could skip rate limiting or return an error
     // For now, let's skip, assuming other middleware handles auth.
     return next();
@@ -74,26 +90,34 @@ export const dynamicRateLimit = (
   next();
 };
 
-// Cleanup old buckets periodically to prevent memory leaks
+/**
+ * Periodically cleans up old rate limit buckets from the in-memory store.
+ * This prevents memory leaks by removing buckets that haven't been refilled
+ * for a specified maximum age (currently 24 hours).
+ */
 export const cleanupOldBuckets = () => {
   const now = Date.now();
-  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+  const maxAge = 24 * 60 * 60 * 1000; // 24 hours: Max age for a bucket before being considered stale
 
-  Object.keys(buckets).forEach((appApiKey) => { // Parameter renamed for clarity
+  Object.keys(buckets).forEach((appApiKey) => { 
     const bucket = buckets[appApiKey];
+    // If the bucket hasn't been refilled in `maxAge` milliseconds, delete it.
     if (now - bucket.lastRefill > maxAge) {
       delete buckets[appApiKey];
     }
   });
 };
 
-// Run cleanup every hour
+// Schedule the cleanup function to run every hour.
 setInterval(cleanupOldBuckets, 60 * 60 * 1000);
 
-// Note: The signature of getRateLimitStatus (userId: string) is now inconsistent 
-// with the bucket keys (appApiKey: string). If this function is used externally,
-// it will need to be updated or called with an appApiKey.
-export const getRateLimitStatus = (apiKey: string) => { // Parameter renamed for clarity
+/**
+ * Retrieves the current rate limit status for a given API key.
+ * Primarily for debugging or potential admin monitoring.
+ * @param apiKey The API key to check the rate limit status for.
+ * @returns An object with `tokensRemaining` and `lastRefill` timestamp, or null if no bucket exists.
+ */
+export const getRateLimitStatus = (apiKey: string) => { 
   const bucket = buckets[apiKey];
   if (!bucket) return null;
 

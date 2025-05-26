@@ -20,6 +20,12 @@ function extractMetric(metricsText: string, metricName: string): string {
 }
 
 export class AdminController {
+  /**
+   * Retrieves the health status of a specified blockchain node.
+   * This includes execution layer, consensus layer, and optionally Prometheus metrics.
+   * @param req Express request object, expects `chain` name in params.
+   * @param res Express response object.
+   */
   public async getNodeHealth(req: Request, res: Response): Promise<void> {
     const chainName = req.params.chain?.toLowerCase();
     if (!chainName) {
@@ -135,6 +141,11 @@ export class AdminController {
     }
   }
 
+  /**
+   * Retrieves a summary of metrics from a specified blockchain node's Prometheus endpoint.
+   * @param req Express request object, expects `chain` name in params.
+   * @param res Express response object.
+   */
   public async getNodeMetrics(req: Request, res: Response): Promise<void> {
     const chainName = req.params.chain?.toLowerCase();
     if (!chainName) {
@@ -188,6 +199,11 @@ export class AdminController {
   }
 
   // Chain Management Methods
+  /**
+   * Adds a new blockchain configuration to the system.
+   * @param req Express request object, expects { name, chainId, isEnabled?, adminNotes? } in body.
+   * @param res Express response object.
+   */
   public async addChain(req: Request, res: Response): Promise<void> {
     try {
       const { name, chainId, isEnabled, adminNotes } = req.body;
@@ -219,6 +235,11 @@ export class AdminController {
     }
   }
 
+  /**
+   * Lists all blockchain configurations currently in the system.
+   * @param req Express request object.
+   * @param res Express response object.
+   */
   public async listChains(req: Request, res: Response): Promise<void> {
     try {
       const chains = await Chain.find();
@@ -229,18 +250,23 @@ export class AdminController {
     }
   }
 
+  /**
+   * Updates an existing blockchain configuration.
+   * @param req Express request object, expects `chainIdToUpdate` in params and 
+   *            { name?, newChainId?, isEnabled?, adminNotes? } in body.
+   * @param res Express response object.
+   */
   public async updateChain(req: Request, res: Response): Promise<void> {
     try {
-      const { chainIdToUpdate } = req.params; // Assuming chainId is used in the route param
+      const { chainIdToUpdate } = req.params; 
       const { name, newChainId, isEnabled, adminNotes } = req.body;
-
 
       if (!chainIdToUpdate) {
           errorResponse(res, 400, 'Chain ID to update must be provided as a URL parameter.');
           return;
       }
       
-      // Ensure at least one updatable field is provided
+      // Ensure at least one updatable field is provided in the request body.
       if (name === undefined && newChainId === undefined && isEnabled === undefined && adminNotes === undefined) {
           errorResponse(res, 400, 'No update fields provided. At least one of name, newChainId, isEnabled, or adminNotes must be supplied.');
           return;
@@ -287,9 +313,14 @@ export class AdminController {
     }
   }
 
+  /**
+   * Deletes a blockchain configuration from the system.
+   * @param req Express request object, expects `chainIdToDelete` in params.
+   * @param res Express response object.
+   */
   public async deleteChain(req: Request, res: Response): Promise<void> {
     try {
-      const { chainIdToDelete } = req.params; // Assuming chainId is used in the route param
+      const { chainIdToDelete } = req.params;
 
       if (!chainIdToDelete) {
           errorResponse(res, 400, 'Chain ID to delete must be provided as a URL parameter.');
@@ -311,23 +342,32 @@ export class AdminController {
     }
   }
 
-  // Method to update app-specific limits
+  /**
+   * Updates the rate limits (maxRps and/or dailyRequestsLimit) for a specific application.
+   * @param req Express request object. Expects `appId` in params, and
+   *            { maxRps?, dailyRequestsLimit? } in the body.
+   * @param res Express response object.
+   */
   public async updateAppLimits(req: Request, res: Response): Promise<void> {
     try {
       const { appId } = req.params;
       const { maxRps, dailyRequestsLimit } = req.body;
 
+      // Validate presence of appId
       if (!appId) {
         errorResponse(res, 400, 'App ID must be provided in the URL path.');
         return;
       }
 
+      // Validate that at least one limit is being provided for update
       if (maxRps === undefined && dailyRequestsLimit === undefined) {
         errorResponse(res, 400, 'At least one limit (maxRps or dailyRequestsLimit) must be provided.');
         return;
       }
 
       const updateFields: { maxRps?: number; dailyRequestsLimit?: number } = {};
+      
+      // Validate and add maxRps to updateFields if provided
       if (maxRps !== undefined) {
         if (typeof maxRps !== 'number' || maxRps < 0) {
           errorResponse(res, 400, 'Invalid value for maxRps. Must be a non-negative number.');
@@ -336,6 +376,7 @@ export class AdminController {
         updateFields.maxRps = maxRps;
       }
 
+      // Validate and add dailyRequestsLimit to updateFields if provided
       if (dailyRequestsLimit !== undefined) {
         if (typeof dailyRequestsLimit !== 'number' || dailyRequestsLimit < 0) {
           errorResponse(res, 400, 'Invalid value for dailyRequestsLimit. Must be a non-negative number.');
