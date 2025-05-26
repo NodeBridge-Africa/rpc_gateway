@@ -5,6 +5,15 @@ import { config } from '../../config'; // Import config
 // If using an older Node version or a specific fetch polyfill, ensure it's properly imported/configured.
 // For this subtask, we assume 'fetch' is available.
 
+// Export for testing
+export function getRandomUrl(urls: string[] | undefined): string | undefined {
+  if (!urls || urls.length === 0) {
+    return undefined;
+  }
+  const randomIndex = Math.floor(Math.random() * urls.length);
+  return urls[randomIndex];
+}
+
 export class ProxyController {
   public async checkProxyHealth(req: Request, res: Response): Promise<void> {
     const chainName = req.params.chain?.toLowerCase();
@@ -20,20 +29,22 @@ export class ProxyController {
       return;
     }
 
-    const { executionRpcUrl, consensusApiUrl } = chainConfig;
+    // Use updated types for executionRpcUrl and consensusApiUrl (string[] | undefined)
+    const { executionRpcUrl: executionRpcUrls, consensusApiUrl: consensusApiUrls } = chainConfig;
 
-    if (!executionRpcUrl && !consensusApiUrl) {
+    if ((!executionRpcUrls || executionRpcUrls.length === 0) && (!consensusApiUrls || consensusApiUrls.length === 0)) {
         res.status(404).json({ error: `No RPC/API URLs configured for chain '${chainName}'.` });
         return;
     }
     
     const healthChecks: any = {}; // Use 'any' for flexibility or define a stricter type
 
-    // Check execution layer if URL is configured
-    if (executionRpcUrl) {
-      healthChecks.execution = { url: executionRpcUrl, status: 'unhealthy' };
+    // Check execution layer
+    const selectedExecutionUrl = getRandomUrl(executionRpcUrls);
+    if (selectedExecutionUrl) {
+      healthChecks.execution = { url: selectedExecutionUrl, status: 'unhealthy' };
       try {
-        const response = await fetch(executionRpcUrl, {
+        const response = await fetch(selectedExecutionUrl, { // Use selected URL
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -47,21 +58,22 @@ export class ProxyController {
         healthChecks.execution.status = response.ok ? 'healthy' : 'unhealthy';
       } catch (error) {
         healthChecks.execution.status = 'unhealthy';
-        console.error(`Health check failed for ${chainName} execution: ${error}`);
+        console.error(`Health check failed for ${chainName} execution on ${selectedExecutionUrl}: ${error}`);
       }
     } else {
       healthChecks.execution = { url: null, status: 'not_configured' };
     }
 
-    // Check consensus layer if URL is configured
-    if (consensusApiUrl) {
-      healthChecks.consensus = { url: consensusApiUrl, status: 'unhealthy' };
+    // Check consensus layer
+    const selectedConsensusUrl = getRandomUrl(consensusApiUrls);
+    if (selectedConsensusUrl) {
+      healthChecks.consensus = { url: selectedConsensusUrl, status: 'unhealthy' };
       try {
-        const response = await fetch(`${consensusApiUrl}/eth/v1/node/health`, { timeout: 5000 }); // Add timeout
+        const response = await fetch(`${selectedConsensusUrl}/eth/v1/node/health`, { timeout: 5000 }); // Add timeout & use selected URL
         healthChecks.consensus.status = response.ok ? 'healthy' : 'unhealthy';
       } catch (error) {
         healthChecks.consensus.status = 'unhealthy';
-        console.error(`Health check failed for ${chainName} consensus: ${error}`);
+        console.error(`Health check failed for ${chainName} consensus on ${selectedConsensusUrl}: ${error}`);
       }
     } else {
       healthChecks.consensus = { url: null, status: 'not_configured' };

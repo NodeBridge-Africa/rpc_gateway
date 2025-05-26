@@ -1,6 +1,6 @@
 export interface ChainConfig {
-  executionRpcUrl?: string;
-  consensusApiUrl?: string;
+  executionRpcUrl?: string[];
+  consensusApiUrl?: string[];
   prometheusUrl?: string;
 }
 

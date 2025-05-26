@@ -128,7 +128,7 @@ ETHEREUM_CONSENSUS_API_URL=http://localhost:5052
 # ETHEREUM_PROMETHEUS_URL=http://localhost:9091 # Optional
 
 # Example: Sepolia Testnet (using a public provider)
-SEPOLIA_EXECUTION_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
+SEPOLIA_EXECUTION_RPC_URL="https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID,https://another-sepolia-node.com/v3/YOUR_OTHER_PROJECT_ID"
 SEPOLIA_CONSENSUS_API_URL=https://sepolia-beacon.infura.io/v3/YOUR_INFURA_PROJECT_ID
 # SEPOLIA_PROMETHEUS_URL= # Optional
 
@@ -137,6 +137,9 @@ HOLESKY_EXECUTION_RPC_URL=https://rpc.holesky.ethpandaops.io
 # HOLESKY_CONSENSUS_API_URL= # Optional
 
 # Add more chains by following the pattern: YOURCHAINNAME_EXECUTION_RPC_URL=...
+# Note on RPC URLs: For _EXECUTION_RPC_URL and _CONSENSUS_API_URL, you can provide a single URL
+# or a comma-separated list of URLs (e.g., "http://node1:8545,http://node2:8545").
+# Providing multiple URLs enables basic round-robin load balancing where a URL is randomly selected for each request.
 ```
 Refer to `src/config/env.example.ts` for more detailed examples and explanations.
 

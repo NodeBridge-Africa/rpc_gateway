@@ -89,11 +89,12 @@ DEFAULT_DAILY_REQUESTS=10000
 # ETHEREUM_PROMETHEUS_URL=http://127.0.0.1:9091
 
 # Example: Sepolia Testnet (defaulted to local, update if using public provider)
-SEPOLIA_EXECUTION_RPC_URL=http://127.0.0.1:8546
-SEPOLIA_CONSENSUS_API_URL=http://127.0.0.1:5053
-# For public providers, comment lines above and uncomment below:
-# SEPOLIA_EXECUTION_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
-# SEPOLIA_CONSENSUS_API_URL=https://sepolia-beacon.infura.io/v3/YOUR_INFURA_PROJECT_ID
+# RPC URLs can be a single URL or a comma-separated list for load balancing e.g., "http://node1:port,http://node2:port"
+SEPOLIA_EXECUTION_RPC_URL="http://127.0.0.1:8546,http://127.0.0.1:8547"
+SEPOLIA_CONSENSUS_API_URL="http://127.0.0.1:5053,http://127.0.0.1:5054"
+# For public providers, comment lines above and uncomment below (ensure to use comma-separated format if needed):
+# SEPOLIA_EXECUTION_RPC_URL="https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID,https://another-sepolia-provider.com/YOUR_KEY"
+# SEPOLIA_CONSENSUS_API_URL="https://sepolia-beacon.infura.io/v3/YOUR_INFURA_PROJECT_ID,https://another-sepolia-beacon.com/YOUR_KEY"
 # SEPOLIA_PROMETHEUS_URL=
 EOF
     print_status ".env file created with secure JWT secret ✓"
