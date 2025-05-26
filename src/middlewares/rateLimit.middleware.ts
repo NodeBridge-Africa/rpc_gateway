@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import { IUser } from "../models/user.model";
+// import { IUser } from "../models/user.model"; // Commented out as IUser is no longer used
+import { IApp } from '../models/app.model'; // Added IApp import
 
 interface RateLimitBucket {
   tokens: number;
@@ -7,31 +8,34 @@ interface RateLimitBucket {
 }
 
 type ApiKeyRequest = Request & {
-  user?: IUser;
+  app?: IApp; // Changed from user?: IUser
 };
 
 // In-memory store for rate limiting buckets
 const buckets: Record<string, RateLimitBucket> = {};
 
 export const dynamicRateLimit = (
-  req: ApiKeyRequest,
+  req: ApiKeyRequest, // This type is now updated
   res: Response,
   next: NextFunction
 ) => {
-  const user = req.user;
+  const app = req.app; // Get the app object from the request
 
-  if (!user) {
-    return next(); // No user found, skip rate limiting
+  if (!app) {
+    // No app found on request (e.g., if apiKeyGuard did not run or did not find an app)
+    // Depending on desired behavior, could skip rate limiting or return an error
+    // For now, let's skip, assuming other middleware handles auth.
+    return next();
   }
 
-  const userId = user._id.toString();
+  const appApiKey = app.apiKey; // Use API key as the unique identifier for the bucket
   const now = Date.now();
-  const maxRps = user.maxRps || 20;
+  const maxRps = app.maxRps; // Use maxRps from the app object
 
-  // Get or create bucket for this user
-  let bucket = buckets[userId];
+  // Get or create bucket for this app API key
+  let bucket = buckets[appApiKey];
   if (!bucket) {
-    bucket = buckets[userId] = {
+    bucket = buckets[appApiKey] = {
       tokens: maxRps,
       lastRefill: now,
     };
@@ -48,7 +52,7 @@ export const dynamicRateLimit = (
   // Check if we have tokens available
   if (bucket.tokens < 1) {
     return res.status(429).json({
-      error: "Rate limit exceeded",
+      error: "Rate limit exceeded for this API key",
       retryAfter: Math.ceil((1 - bucket.tokens) / maxRps),
       limit: maxRps,
       remaining: Math.floor(bucket.tokens),
@@ -75,10 +79,10 @@ export const cleanupOldBuckets = () => {
   const now = Date.now();
   const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
-  Object.keys(buckets).forEach((userId) => {
-    const bucket = buckets[userId];
+  Object.keys(buckets).forEach((appApiKey) => { // Parameter renamed for clarity
+    const bucket = buckets[appApiKey];
     if (now - bucket.lastRefill > maxAge) {
-      delete buckets[userId];
+      delete buckets[appApiKey];
     }
   });
 };
@@ -86,8 +90,11 @@ export const cleanupOldBuckets = () => {
 // Run cleanup every hour
 setInterval(cleanupOldBuckets, 60 * 60 * 1000);
 
-export const getRateLimitStatus = (userId: string) => {
-  const bucket = buckets[userId];
+// Note: The signature of getRateLimitStatus (userId: string) is now inconsistent 
+// with the bucket keys (appApiKey: string). If this function is used externally,
+// it will need to be updated or called with an appApiKey.
+export const getRateLimitStatus = (apiKey: string) => { // Parameter renamed for clarity
+  const bucket = buckets[apiKey];
   if (!bucket) return null;
 
   return {

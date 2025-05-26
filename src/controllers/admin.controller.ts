@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
 import { config } from '../../config'; // Import the new config
+import Chain from '../models/chain.model';
+import App from '../models/app.model'; // Import App model
+import { successResponse, errorResponse } from '../utils/responseHandler';
 
 // Helper function (can be a private static method or defined within the class methods if preferred)
 function extractMetric(metricsText: string, metricName: string): string {
@@ -181,6 +184,188 @@ export class AdminController {
         error: 'Failed to fetch node metrics',
         details: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
+  }
+
+  // Chain Management Methods
+  public async addChain(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, chainId, isEnabled, adminNotes } = req.body;
+
+      if (!name || !chainId) {
+        errorResponse(res, 400, 'Missing required fields: name, chainId.');
+        return;
+      }
+
+      const existingChain = await Chain.findOne({ $or: [{ name }, { chainId }] });
+      if (existingChain) {
+        errorResponse(res, 409, `Chain with name '${name}' or chainId '${chainId}' already exists.`);
+        return;
+      }
+
+      const newChain = new Chain({
+        name,
+        chainId,
+        isEnabled: isEnabled !== undefined ? isEnabled : true, // Default to true if not provided
+        adminNotes,
+      });
+
+      await newChain.save();
+      successResponse(res, 201, 'Chain added successfully.', { chain: newChain });
+
+    } catch (error) {
+      console.error('Error adding chain:', error);
+      errorResponse(res, 500, 'Internal server error while adding chain.', { details: (error as Error).message });
+    }
+  }
+
+  public async listChains(req: Request, res: Response): Promise<void> {
+    try {
+      const chains = await Chain.find();
+      successResponse(res, 200, 'Chains retrieved successfully.', { chains });
+    } catch (error) {
+      console.error('Error listing chains:', error);
+      errorResponse(res, 500, 'Internal server error while listing chains.', { details: (error as Error).message });
+    }
+  }
+
+  public async updateChain(req: Request, res: Response): Promise<void> {
+    try {
+      const { chainIdToUpdate } = req.params; // Assuming chainId is used in the route param
+      const { name, newChainId, isEnabled, adminNotes } = req.body;
+
+
+      if (!chainIdToUpdate) {
+          errorResponse(res, 400, 'Chain ID to update must be provided as a URL parameter.');
+          return;
+      }
+      
+      // Ensure at least one updatable field is provided
+      if (name === undefined && newChainId === undefined && isEnabled === undefined && adminNotes === undefined) {
+          errorResponse(res, 400, 'No update fields provided. At least one of name, newChainId, isEnabled, or adminNotes must be supplied.');
+          return;
+      }
+
+      const chain = await Chain.findOne({ chainId: chainIdToUpdate });
+      if (!chain) {
+        errorResponse(res, 404, `Chain with chainId '${chainIdToUpdate}' not found.`);
+        return;
+      }
+
+      // Check for conflicts if name or newChainId is being updated
+      if (name && name !== chain.name) {
+          const conflictingChain = await Chain.findOne({ name });
+          if (conflictingChain) {
+              errorResponse(res, 409, `Another chain with name '${name}' already exists.`);
+              return;
+          }
+          chain.name = name;
+      }
+
+      if (newChainId && newChainId !== chain.chainId) {
+          const conflictingChain = await Chain.findOne({ chainId: newChainId });
+          if (conflictingChain) {
+              errorResponse(res, 409, `Another chain with chainId '${newChainId}' already exists.`);
+              return;
+          }
+          chain.chainId = newChainId;
+      }
+
+      if (isEnabled !== undefined) {
+        chain.isEnabled = isEnabled;
+      }
+      if (adminNotes !== undefined) {
+        chain.adminNotes = adminNotes;
+      }
+
+      await chain.save();
+      successResponse(res, 200, 'Chain updated successfully.', { chain });
+
+    } catch (error) {
+      console.error('Error updating chain:', error);
+      errorResponse(res, 500, 'Internal server error while updating chain.', { details: (error as Error).message });
+    }
+  }
+
+  public async deleteChain(req: Request, res: Response): Promise<void> {
+    try {
+      const { chainIdToDelete } = req.params; // Assuming chainId is used in the route param
+
+      if (!chainIdToDelete) {
+          errorResponse(res, 400, 'Chain ID to delete must be provided as a URL parameter.');
+          return;
+      }
+
+      const result = await Chain.deleteOne({ chainId: chainIdToDelete });
+
+      if (result.deletedCount === 0) {
+        errorResponse(res, 404, `Chain with chainId '${chainIdToDelete}' not found.`);
+        return;
+      }
+
+      successResponse(res, 200, 'Chain deleted successfully.');
+
+    } catch (error) {
+      console.error('Error deleting chain:', error);
+      errorResponse(res, 500, 'Internal server error while deleting chain.', { details: (error as Error).message });
+    }
+  }
+
+  // Method to update app-specific limits
+  public async updateAppLimits(req: Request, res: Response): Promise<void> {
+    try {
+      const { appId } = req.params;
+      const { maxRps, dailyRequestsLimit } = req.body;
+
+      if (!appId) {
+        errorResponse(res, 400, 'App ID must be provided in the URL path.');
+        return;
+      }
+
+      if (maxRps === undefined && dailyRequestsLimit === undefined) {
+        errorResponse(res, 400, 'At least one limit (maxRps or dailyRequestsLimit) must be provided.');
+        return;
+      }
+
+      const updateFields: { maxRps?: number; dailyRequestsLimit?: number } = {};
+      if (maxRps !== undefined) {
+        if (typeof maxRps !== 'number' || maxRps < 0) {
+          errorResponse(res, 400, 'Invalid value for maxRps. Must be a non-negative number.');
+          return;
+        }
+        updateFields.maxRps = maxRps;
+      }
+
+      if (dailyRequestsLimit !== undefined) {
+        if (typeof dailyRequestsLimit !== 'number' || dailyRequestsLimit < 0) {
+          errorResponse(res, 400, 'Invalid value for dailyRequestsLimit. Must be a non-negative number.');
+          return;
+        }
+        updateFields.dailyRequestsLimit = dailyRequestsLimit;
+      }
+
+      const app = await App.findByIdAndUpdate(
+        appId,
+        { $set: updateFields },
+        { new: true, runValidators: true }
+      );
+
+      if (!app) {
+        errorResponse(res, 404, `App with ID '${appId}' not found.`);
+        return;
+      }
+
+      successResponse(res, 200, 'App limits updated successfully.', { app });
+
+    } catch (error) {
+      console.error('Error updating app limits:', error);
+      if ((error as any).name === 'CastError' && (error as any).path === '_id') {
+           errorResponse(res, 400, 'Invalid App ID format.');
+      } else if ((error as any).name === 'ValidationError') {
+           errorResponse(res, 400, 'Validation error.', { details: (error as Error).message });
+      } else {
+           errorResponse(res, 500, 'Internal server error while updating app limits.', { details: (error as Error).message });
+      }
     }
   }
 }
