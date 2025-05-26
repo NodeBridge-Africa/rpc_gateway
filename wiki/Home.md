@@ -7,13 +7,13 @@ Welcome to the **NodeBridge RPC Gateway** documentation wiki! This comprehensive
 ### 📖 **Getting Started**
 
 - [Installation Guide](Installation-Guide) - Step-by-step setup instructions
-- [Configuration Guide](Configuration-Guide) - Environment and settings configuration
+- [Configuration Guide](Configuration-Guide) - Environment and settings configuration, including setting up multiple chains using prefixed environment variables (e.g., `ETHEREUM_EXECUTION_RPC_URL`).
 - [Quick Start Tutorial](Quick-Start-Tutorial) - Get up and running in 10 minutes
 
 ### 📚 **API Documentation**
 
 - [Authentication API](Authentication-API) - User registration, login, and JWT handling
-- [RPC Proxy API](RPC-Proxy-API) - Ethereum execution and consensus layer access
+- [RPC Proxy API](RPC-Proxy-API) - Access to Ethereum execution and consensus layers across configured chains.
 - [Monitoring API](Monitoring-API) - Health checks and metrics endpoints
 - [Admin API](Admin-API) - Administrative endpoints and node health
 - [Routes Documentation](routes.md) - Detailed list of all API routes
@@ -62,14 +62,14 @@ Welcome to the **NodeBridge RPC Gateway** documentation wiki! This comprehensive
 
 ## 🎯 **What is NodeBridge?**
 
-NodeBridge RPC Gateway is a **production-ready**, multi-tenant RPC gateway that provides controlled access to your private Ethereum Sepolia node infrastructure. It's similar to services like Alchemy or Infura, but designed for your own nodes with enterprise-grade monitoring and security.
+NodeBridge RPC Gateway is a **production-ready**, multi-tenant RPC gateway that provides controlled access to your private Ethereum Sepolia node infrastructure. It's similar to services like Alchemy or Infura, but designed for your own nodes with enterprise-grade monitoring and security, capable of managing multiple blockchain environments.
 
 ### Key Features:
 
 - 🔐 **Multi-tenant security** with JWT authentication
 - ⚡ **Advanced rate limiting** with token bucket algorithm
 - 📊 **Enterprise monitoring** with Prometheus metrics
-- 🌐 **Dual layer support** for execution and consensus layers
+- 🌐 **Multi-Chain & Dual Layer Support** for execution and consensus layers. Configure multiple chains by setting environment variables like `CHAINNAME_EXECUTION_RPC_URL`.
 - 🛡️ **Production security** with comprehensive protection
 
 ## 🏗️ **Architecture Overview**
