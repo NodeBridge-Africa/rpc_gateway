@@ -5,10 +5,10 @@ const router = Router(); // Changed this line
 const adminController = new AdminController(); // Instantiate the controller
 
 // Admin endpoint to check node infrastructure health
-router.get('/node-health', adminController.getNodeHealth);
+router.get('/node-health/:chain', adminController.getNodeHealth); // Added :chain
 
 // Get node metrics summary
-router.get('/node-metrics', adminController.getNodeMetrics);
+router.get('/node-metrics/:chain', adminController.getNodeMetrics); // Added :chain
 
 // The extractMetric function should now be part of AdminController
 // and is no longer needed here.
