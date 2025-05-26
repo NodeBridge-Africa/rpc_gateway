@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import User, { IUser } from "../models/user.model";
+import App, { IApp } from "../models/app.model";
 
 export type ApiKeyRequest = Request & {
-  user?: IUser;
+  app?: IApp;
   apiKey?: string;
 };
 
@@ -21,8 +21,8 @@ export const apiKeyGuard = async (
       });
     }
 
-    // Find user by API key and increment request counter
-    const user = await User.findOneAndUpdate(
+    // Find app by API key and increment request counter
+    const app = await App.findOneAndUpdate(
       {
         apiKey: key,
         isActive: true,
@@ -38,25 +38,25 @@ export const apiKeyGuard = async (
       }
     );
 
-    if (!user) {
+    if (!app) {
       return res.status(403).json({
         error: "Invalid or inactive API key",
       });
     }
 
     // Reset daily requests if needed
-    user.resetDailyRequestsIfNeeded();
+    await app.resetDailyRequestsIfNeeded();
 
     // Check daily limits
     const dailyLimit = parseInt(process.env.DEFAULT_DAILY_REQUESTS || "10000");
-    if (user.dailyRequests > dailyLimit) {
+    if (app.dailyRequests > dailyLimit) {
       return res.status(429).json({
         error: "Daily request limit exceeded",
       });
     }
 
-    // Attach user to request object for rate limiting
-    req.user = user;
+    // Attach app to request object for rate limiting
+    req.app = app;
     req.apiKey = key;
 
     // The proxy middleware will handle path rewriting with pathRewrite option

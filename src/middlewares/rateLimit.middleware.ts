@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { IUser } from "../models/user.model";
+import { IApp } from "../models/app.model"; // Import IApp
 
 interface RateLimitBucket {
   tokens: number;
@@ -7,7 +7,7 @@ interface RateLimitBucket {
 }
 
 type ApiKeyRequest = Request & {
-  user?: IUser;
+  app?: IApp; // Changed from user to app
 };
 
 // In-memory store for rate limiting buckets
@@ -18,20 +18,20 @@ export const dynamicRateLimit = (
   res: Response,
   next: NextFunction
 ) => {
-  const user = req.user;
+  const app = req.app; // Use req.app
 
-  if (!user) {
-    return next(); // No user found, skip rate limiting
+  if (!app) {
+    return next(); // No app found, skip rate limiting (should be caught by apiKeyGuard)
   }
 
-  const userId = user._id.toString();
+  const appApiKey = app.apiKey; // Use app.apiKey as the bucket key
   const now = Date.now();
-  const maxRps = user.maxRps || 20;
+  const maxRps = app.maxRps || 20; // Use app.maxRps
 
-  // Get or create bucket for this user
-  let bucket = buckets[userId];
+  // Get or create bucket for this app
+  let bucket = buckets[appApiKey];
   if (!bucket) {
-    bucket = buckets[userId] = {
+    bucket = buckets[appApiKey] = {
       tokens: maxRps,
       lastRefill: now,
     };
@@ -75,10 +75,10 @@ export const cleanupOldBuckets = () => {
   const now = Date.now();
   const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
-  Object.keys(buckets).forEach((userId) => {
-    const bucket = buckets[userId];
+  Object.keys(buckets).forEach((apiKey) => { // Changed userId to apiKey
+    const bucket = buckets[apiKey];
     if (now - bucket.lastRefill > maxAge) {
-      delete buckets[userId];
+      delete buckets[apiKey];
     }
   });
 };
@@ -86,8 +86,8 @@ export const cleanupOldBuckets = () => {
 // Run cleanup every hour
 setInterval(cleanupOldBuckets, 60 * 60 * 1000);
 
-export const getRateLimitStatus = (userId: string) => {
-  const bucket = buckets[userId];
+export const getRateLimitStatus = (apiKey: string) => { // Changed userId to apiKey
+  const bucket = buckets[apiKey];
   if (!bucket) return null;
 
   return {

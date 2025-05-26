@@ -14,19 +14,21 @@ A **production-ready**, multi-tenant RPC gateway providing controlled access to 
 
 ## 🚀 Features
 
-### 🔐 **Multi-Tenant Security**
+### 🔐 **Multi-Tenant Security & App Management**
 
-- JWT-based authentication system
-- Unique API keys per user
-- Role-based access control
-- Input validation & sanitization
+- JWT-based authentication system for user accounts.
+- **App-Based API Keys**: Users create "Apps", each tied to a specific blockchain (e.g., Ethereum Sepolia). Each App gets its own unique API key.
+- **App Limit**: Users can create up to 5 Apps by default.
+- **Admin-Managed Chains**: Administrators manage the list of available blockchains that users can create Apps for.
+- Role-based access control (user vs. admin).
+- Input validation & sanitization.
 
 ### ⚡ **Advanced Rate Limiting**
 
-- Token bucket algorithm implementation
-- Per-user RPS and daily limits
-- Automatic rate limit recovery
-- Real-time usage tracking
+- Token bucket algorithm implementation.
+- **Per-App Rate Limiting**: Rate limits (RPS and daily limits) are now applied on a per-App basis, using each App's unique API key.
+- Automatic rate limit recovery.
+- Real-time usage tracking per App.
 
 ### 📊 **Enterprise Monitoring**
 
@@ -114,15 +116,22 @@ MONGO_URI=mongodb://localhost:27017/nodebridge
 # Security
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 
-# Ethereum Node Endpoints
-EXECUTION_RPC_URL=http://localhost:8545
+# Ethereum Node Endpoints (These are examples, the gateway routes requests based on App's chain configuration)
+# The gateway itself does not directly connect to a single node anymore for all users.
+# Instead, it will proxy requests to the appropriate node based on the chain an App is configured for.
+# The actual node URLs for specific chains are now managed via the Admin API.
+# EXECUTION_RPC_URL and CONSENSUS_API_URL in this .env might be used for health checks or specific internal purposes,
+# but are NOT the primary means of routing user RPC requests.
+EXECUTION_RPC_URL=http://localhost:8545 
 CONSENSUS_API_URL=http://localhost:5052
 
 # Prometheus Monitoring (Optional)
 PROMETHEUS_URL=http://localhost:9090
 
-# Rate Limiting Defaults
-DEFAULT_MAX_RPS=20
+# Default Rate Limiting for Apps
+# DEFAULT_APP_MAX_RPS is defined as a constant in src/config/constants.ts (currently 20 RPS)
+# This value is used when a new App is created.
+# DEFAULT_DAILY_REQUESTS applies per App API key.
 DEFAULT_DAILY_REQUESTS=10000
 ```
 
@@ -171,18 +180,17 @@ Content-Type: application/json
   "success": true,
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "apiKey": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "user": {
       "id": "637f4a2e8b12c45678901234",
       "email": "developer@example.com",
-      "apiKey": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "maxRps": 20,
-      "dailyRequestLimit": 10000,
+      "appCount": 0,
+      "isAdmin": false,
       "createdAt": "2024-01-01T00:00:00.000Z"
     }
   }
 }
 ```
+*Note: The `apiKey` and `maxRps` fields are no longer returned at the user level. API keys are now associated with "Apps".*
 
 #### User Login
 
@@ -195,36 +203,83 @@ Content-Type: application/json
   "password": "SecurePassword123!"
 }
 ```
+*(Response will contain a JWT token and basic user information, excluding API keys.)*
 
 #### Get Account Information
 
 ```bash
 GET /auth/account
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <YOUR_JWT_TOKEN>
 ```
+*(Returns user details including `appCount` and `isAdmin` status. Does not return API keys.)*
 
-#### Regenerate API Key
-
-```bash
-POST /auth/regenerate-api-key
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-#### Get Usage Statistics
+#### Get Usage Statistics (User Level - Deprecated)
 
 ```bash
 GET /auth/usage
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <YOUR_JWT_TOKEN>
 ```
+*(This endpoint now indicates that user-level usage is deprecated and directs users to check per-application usage. Specific app usage details are not yet exposed via a dedicated API endpoint in this version.)*
 
-### ⚡ RPC Endpoints
+
+### 📱 Application (App) Management
+
+Users can create and manage "Apps". Each App is tied to a specific blockchain and has its own API key.
+
+#### Create a New App
+
+```bash
+POST /apps
+Authorization: Bearer <YOUR_JWT_TOKEN>
+Content-Type: application/json
+
+{
+  "name": "My First Ethereum App",
+  "description": "App for interacting with Ethereum Sepolia",
+  "chainName": "Ethereum Sepolia", // Must be a chainName configured by an admin
+  "chainId": "11155111" // Must be a chainId configured by an admin
+}
+```
+**Response:**
+```json
+{
+  "userId": "637f4a2e8b12c45678901234",
+  "name": "My First Ethereum App",
+  "description": "App for interacting with Ethereum Sepolia",
+  "apiKey": "app-api-key-generated-for-this-app", // This is YOUR_APP_API_KEY
+  "chainName": "Ethereum Sepolia",
+  "chainId": "11155111",
+  "maxRps": 20, // Default RPS for the app
+  "requests": 0,
+  "dailyRequests": 0,
+  "lastResetDate": "2024-01-01T00:00:00.000Z",
+  "isActive": true,
+  "_id": "appGeneratedMongoId",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+*Users are limited to a certain number of apps (e.g., 5).*
+
+#### List User's Apps
+
+```bash
+GET /apps
+Authorization: Bearer <YOUR_JWT_TOKEN>
+```
+*(Returns an array of all Apps created by the authenticated user.)*
+
+
+### 🔗 Using App-Specific API Keys for RPC Access
+
+Once an App is created, use its `apiKey` in the RPC endpoint paths.
 
 #### Execution Layer (JSON-RPC)
 
-Access standard Ethereum JSON-RPC methods:
+Access standard Ethereum JSON-RPC methods using an App's API key:
 
 ```bash
-POST /exec/<YOUR_API_KEY>
+POST /exec/<YOUR_APP_API_KEY>
 Content-Type: application/json
 
 {
@@ -234,6 +289,7 @@ Content-Type: application/json
   "id": 1
 }
 ```
+*The request will be routed to the blockchain specified when creating the App (e.g., Ethereum Sepolia).*
 
 **Supported Methods:**
 
@@ -243,17 +299,29 @@ Content-Type: application/json
 - `eth_getTransactionReceipt`
 - `eth_sendRawTransaction`
 - `eth_call`
-- All standard Ethereum JSON-RPC methods
+- All standard Ethereum JSON-RPC methods supported by the target chain.
 
 #### Consensus Layer (Beacon API)
 
-Access Ethereum consensus layer data:
+Access Ethereum consensus layer data using an App's API key:
 
 ```bash
-GET /cons/<YOUR_API_KEY>/eth/v1/beacon/headers
-GET /cons/<YOUR_API_KEY>/eth/v1/beacon/blocks/head
-GET /cons/<YOUR_API_KEY>/eth/v1/node/syncing
+GET /cons/<YOUR_APP_API_KEY>/eth/v1/beacon/headers
+GET /cons/<YOUR_APP_API_KEY>/eth/v1/beacon/blocks/head
+GET /cons/<YOUR_APP_API_KEY>/eth/v1/node/syncing
 ```
+*The request will be routed to the consensus layer of the blockchain specified for the App.*
+
+
+### ⛓️ Chain Management (Admin Only)
+
+Administrators have a separate set of endpoints under `/admin/chains` to manage the available blockchains that users can create Apps for. These require an admin user's JWT token.
+
+- `POST /admin/chains`: Add a new chain.
+- `GET /admin/chains`: List all configured chains.
+- `PUT /admin/chains/:chainId`: Update a chain's details (e.g., enable/disable, description).
+- `DELETE /admin/chains/:chainId`: Remove a chain.
+
 
 ### 📊 Monitoring Endpoints
 
@@ -282,43 +350,46 @@ GET /metrics
 
 Returns Prometheus-formatted metrics including:
 
-- `rpc_gateway_requests_total`
-- `rpc_gateway_request_duration_seconds`
-- `ethereum_execution_syncing`
-- `ethereum_consensus_head_slot`
+- `rpc_gateway_requests_total` (labels include `apiKey` to identify app)
+- `rpc_gateway_request_duration_seconds` (labels include `apiKey`)
+- `ethereum_execution_syncing` (if applicable, based on configured health checks)
+- `ethereum_consensus_head_slot` (if applicable)
 - And many more...
 
 #### Admin: Node Health
 
 ```bash
-GET /admin/node-health
+GET /admin/node-health 
+Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
+*Note: This endpoint might provide general health of configured nodes for the system or a specific chain, requiring admin privileges.*
 
-**Response:**
-
+**Response Example (Conceptual):**
 ```json
 {
   "timestamp": "2024-01-01T12:00:00.000Z",
-  "execution": {
-    "status": "healthy",
-    "syncing": false,
-    "endpoint": "http://localhost:8545"
-  },
-  "consensus": {
-    "status": "healthy",
-    "syncing": false,
-    "head_slot": "7685000",
-    "endpoint": "http://localhost:5052"
-  },
-  "overall": "healthy"
+  // Health details might be per configured chain or a general overview
+  "chains": [
+    {
+      "chainName": "Ethereum Sepolia",
+      "chainId": "11155111",
+      "execution": { "status": "healthy", "syncing": false, "endpoint": "configured_sepolia_exec_url" },
+      "consensus": { "status": "healthy", "syncing": false, "head_slot": "...", "endpoint": "configured_sepolia_cons_url" }
+    }
+    // ... other configured chains
+  ],
+  "overallGatewayStatus": "healthy"
 }
 ```
+*(The exact structure of `/admin/node-health` and `/admin/node-metrics` might need further definition based on how chain node URLs are stored and accessed by admin functions.)*
 
 #### Admin: Node Metrics
 
 ```bash
 GET /admin/node-metrics
+Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
+*(Similar to node health, this would likely be admin-protected and could provide metrics for specific configured chains.)*
 
 ## 💻 Usage Examples
 
@@ -327,8 +398,8 @@ GET /admin/node-metrics
 ```javascript
 const Web3 = require("web3");
 
-// Initialize with your NodeBridge gateway
-const web3 = new Web3("http://localhost:8888/exec/YOUR-API-KEY");
+// Initialize with your NodeBridge gateway using an App's API Key
+const web3 = new Web3("http://localhost:8888/exec/YOUR_APP_API_KEY");
 
 async function example() {
   // Get latest block number
@@ -348,8 +419,8 @@ async function example() {
 ```javascript
 const { JsonRpcProvider } = require("ethers");
 
-// Initialize provider
-const provider = new JsonRpcProvider("http://localhost:8888/exec/YOUR-API-KEY");
+// Initialize provider using an App's API Key
+const provider = new JsonRpcProvider("http://localhost:8888/exec/YOUR_APP_API_KEY");
 
 async function example() {
   // Get network information
@@ -365,13 +436,13 @@ async function example() {
 ### cURL Examples
 
 ```bash
-# Get latest block number
-curl -X POST http://localhost:8888/exec/YOUR-API-KEY \
+# Get latest block number using an App's API Key
+curl -X POST http://localhost:8888/exec/YOUR_APP_API_KEY \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
-# Get consensus layer sync status
-curl http://localhost:8888/cons/YOUR-API-KEY/eth/v1/node/syncing
+# Get consensus layer sync status using an App's API Key
+curl http://localhost:8888/cons/YOUR_APP_API_KEY/eth/v1/node/syncing
 
 # Check gateway health
 curl http://localhost:8888/health
@@ -447,10 +518,10 @@ The gateway exposes comprehensive metrics for monitoring:
 
 #### **Gateway Performance Metrics**
 
-- `rpc_gateway_requests_total` - Request counts by endpoint/user
-- `rpc_gateway_request_duration_seconds` - Request latency histograms
+- `rpc_gateway_requests_total` - Request counts by endpoint/app (via `apiKey` label)
+- `rpc_gateway_request_duration_seconds` - Request latency histograms (per app)
 - `rpc_gateway_active_connections` - Current connections
-- `rpc_gateway_rate_limit_hits_total` - Rate limiting events
+- `rpc_gateway_rate_limit_hits_total` - Rate limiting events (per app)
 
 #### **Ethereum Node Health Metrics**
 
@@ -675,8 +746,7 @@ rpc_gateway/
 | `EXECUTION_RPC_URL`      | Ethereum execution node      | `http://localhost:8545`                | Yes      |
 | `CONSENSUS_API_URL`      | Ethereum consensus node      | `http://localhost:5052`                | Yes      |
 | `PROMETHEUS_URL`         | Prometheus metrics endpoint  | -                                      | No       |
-| `DEFAULT_MAX_RPS`        | Rate limit (requests/second) | `20`                                   | No       |
-| `DEFAULT_DAILY_REQUESTS` | Daily request limit          | `10000`                                | No       |
+| `DEFAULT_DAILY_REQUESTS` | Daily request limit per App  | `10000`                                | No       |
 
 ### Development Workflow
 
@@ -715,69 +785,56 @@ rpc_gateway/
 
 We welcome contributions! Please read our contribution guidelines below.
 
-### 🚀 Getting Started
+### 🚀 Getting Started with Contributing
+(Contribution process remains largely the same, ensure local setup reflects new App/Chain model if contributing to those areas)
 
-1. **Fork the Repository**
+1.  **Fork the Repository**
+    ```bash
+    # Click "Fork" on GitHub, then clone your fork
+    git clone https://github.com/YOUR-USERNAME/rpc_gateway.git
+    cd rpc_gateway
+    ```
 
-   ```bash
-   # Click "Fork" on GitHub, then clone your fork
-   git clone https://github.com/YOUR-USERNAME/rpc_gateway.git
-   cd rpc_gateway
-   ```
+2.  **Set Up Development Environment**
+    ```bash
+    # Install dependencies
+    yarn install
 
-2. **Set Up Development Environment**
+    # Copy environment file
+    cp .env.example .env
+    # Edit .env with your local settings (especially MONGO_URI, JWT_SECRET)
 
-   ```bash
-   # Install dependencies
-   yarn install
+    # Start MongoDB (if running locally)
+    sudo systemctl start mongod
 
-   # Copy environment file
-   cp .env.example .env
-   # Edit .env with your local settings
+    # Run tests to ensure everything works (including setting up initial admin user and chains for some tests)
+    yarn test
+    ```
+    *Note: Some integration tests might require initial setup of admin users and chains. Check test setup files.*
 
-   # Start MongoDB (if running locally)
-   sudo systemctl start mongod
-
-   # Run tests to ensure everything works
-   yarn test
-   ```
-
-3. **Create Feature Branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   # or
-   git checkout -b fix/issue-description
-   ```
+3.  **Create Feature Branch**
+    ```bash
+    git checkout -b feature/your-feature-name
+    # or
+    git checkout -b fix/issue-description
+    ```
 
 ### 📝 Development Guidelines
 
 #### **Code Style**
-
+(Guidelines remain the same)
 We use TypeScript with strict typing and ESLint for code quality:
-
 ```bash
 # Check code style
 yarn lint
 
 # Auto-fix style issues
 yarn lint:fix
-
-# Type checking
-yarn type-check
 ```
 
-**Style Guidelines:**
-
-- Use TypeScript strict mode
-- Prefer `const` over `let`
-- Use meaningful variable names
-- Add JSDoc comments for public functions
-- Follow existing naming conventions
-
 #### **Testing Requirements**
-
+(Guidelines remain the same, adapt tests for new App/Chain model)
 All contributions must include appropriate tests:
-
 ```bash
 # Run all tests
 yarn test
@@ -788,198 +845,51 @@ yarn test:watch
 # Check test coverage
 yarn test:coverage
 ```
-
 **Testing Guidelines:**
-
-- **Unit tests** for utility functions and pure logic
-- **Integration tests** for API endpoints
-- **Database tests** for model operations
-- Maintain >90% test coverage
-- Mock external dependencies appropriately
+-   **Unit tests** for utility functions, individual model methods, and pure logic.
+-   **Integration tests** for API endpoints, ensuring correct interaction between controllers, services, and models.
+-   Cover new App creation, listing, API key access, and admin chain management.
+-   Maintain >90% test coverage.
+-   Mock external dependencies appropriately.
 
 #### **Commit Convention**
+(Convention remains the same)
+We follow [Conventional Commits](https://www.conventionalcommits.org/).
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```bash
-# Feature commits
-git commit -m "feat: add consensus layer health monitoring"
-
-# Bug fixes
-git commit -m "fix: resolve rate limiting edge case"
-
-# Documentation
-git commit -m "docs: update API documentation"
-
-# Tests
-git commit -m "test: add integration tests for auth flow"
-
-# Refactoring
-git commit -m "refactor: optimize metrics collection"
-```
-
-### 🐛 Bug Reports
-
-When reporting bugs, please include:
-
-1. **Clear Description**: What happened vs. what you expected
-2. **Reproduction Steps**: Detailed steps to reproduce the issue
-3. **Environment Info**: OS, Node.js version, MongoDB version
-4. **Error Logs**: Complete error messages and stack traces
-5. **Configuration**: Relevant `.env` settings (redacted secrets)
-
-**Template:**
-
-```markdown
-## Bug Description
-
-Brief description of the issue
-
-## Steps to Reproduce
-
-1. Step one
-2. Step two
-3. Step three
-
-## Expected Behavior
-
-What should happen
-
-## Actual Behavior
-
-What actually happens
-
-## Environment
-
-- OS: Ubuntu 22.04
-- Node.js: v18.17.0
-- MongoDB: v6.0.8
-- Gateway Version: v1.0.0
-
-## Error Logs
-```
-
-Error logs here
-
-````
-
-## Configuration
-```env
-# Redacted .env content
-````
-
-````
-
-### 💡 Feature Requests
-
-For new features, please:
-
-1. **Check Existing Issues**: Avoid duplicates
-2. **Describe Use Case**: Why is this feature needed?
-3. **Propose Solution**: How should it work?
-4. **Consider Alternatives**: Other ways to solve the problem?
-
-**Template:**
-```markdown
-## Feature Request
-
-### Problem/Use Case
-Describe the problem this feature would solve
-
-### Proposed Solution
-How should this feature work?
-
-### Alternatives Considered
-Other approaches you've considered
-
-### Additional Context
-Any other relevant information
-````
+### 🐛 Bug Reports & 💡 Feature Requests
+(Templates and process remain the same)
 
 ### 🔧 Development Areas
-
 We welcome contributions in these areas:
 
-#### **🔐 Security & Authentication**
-
-- OAuth 2.0 / OpenID Connect integration
-- API key rotation mechanisms
-- Advanced rate limiting strategies
-- Audit logging improvements
+#### **🔐 Security & App/Chain Management**
+-   Fine-grained permissions for Apps (e.g., allowed RPC methods).
+-   API key rotation mechanisms for Apps.
+-   Admin UI for managing users and chains.
+-   Advanced rate limiting strategies (e.g., per method, burst limits for apps).
 
 #### **📊 Monitoring & Analytics**
-
-- Additional Prometheus metrics
-- Grafana dashboard templates
-- Alerting rule definitions
-- Performance optimization
+-   Detailed per-App usage metrics and dashboards.
+-   Alerting for specific app behaviors or chain issues.
 
 #### **🌐 Network & Protocols**
-
-- WebSocket support
-- Additional blockchain networks
-- Protocol optimizations
-- Connection pooling
+-   Support for more blockchain networks (configurable via Admin API).
+-   Dynamic node endpoint management per chain.
 
 #### **🧪 Testing & Quality**
-
-- Performance benchmarks
-- Load testing scenarios
-- Security testing
-- Documentation improvements
+(Guidelines remain the same)
 
 #### **🚀 DevOps & Deployment**
-
-- Docker improvements
-- Kubernetes manifests
-- CI/CD pipeline enhancements
-- Infrastructure as Code
+(Guidelines remain the same)
 
 ### 📋 Pull Request Process
-
-1. **Ensure Tests Pass**
-
-   ```bash
-   yarn test          # All tests must pass
-   yarn lint          # No linting errors
-   yarn build         # Must build successfully
-   ```
-
-2. **Update Documentation**
-
-   - Update README.md if adding features
-   - Add API documentation
-   - Include inline code comments
-   - Update changelog if applicable
-
-3. **Create Quality PR**
-
-   - Clear title and description
-   - Reference related issues
-   - Include test evidence
-   - Add screenshots for UI changes
-
-4. **Review Process**
-   - Automated CI checks must pass
-   - Code review by maintainers
-   - Testing in development environment
-   - Final approval and merge
+(Process remains the same)
 
 ### 📞 Getting Help
-
-- **Questions**: Open a GitHub Discussion
-- **Bug Reports**: Create a GitHub Issue
-- **Security Issues**: Email security@yourdomain.com
-- **Feature Ideas**: Start with a GitHub Discussion
+(Channels remain the same)
 
 ### 🏆 Recognition
-
-Contributors will be:
-
-- Listed in CONTRIBUTORS.md
-- Mentioned in release notes
-- Credited in documentation
-- Invited to maintainer discussions
+(Process remains the same)
 
 ---
 

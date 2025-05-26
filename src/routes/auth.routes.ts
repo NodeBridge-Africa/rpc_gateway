@@ -55,12 +55,11 @@ router.post(
         success: true,
         data: {
           token,
-          apiKey: user.apiKey,
           user: {
             id: user._id,
             email: user.email,
-            apiKey: user.apiKey,
-            maxRps: user.maxRps,
+            appCount: user.appCount,
+            isAdmin: user.isAdmin,
             createdAt: user.createdAt,
           },
         },
@@ -112,14 +111,10 @@ router.post("/login", loginValidation, async (req: Request, res: Response) => {
       success: true,
       data: {
         token,
-        apiKey: user.apiKey,
         user: {
           id: user._id,
           email: user.email,
-          apiKey: user.apiKey,
-          maxRps: user.maxRps,
-          requests: user.requests,
-          dailyRequests: user.dailyRequests,
+          // appCount and other relevant user fields can be added here if needed upon login
         },
       },
     });
@@ -141,65 +136,22 @@ router.get("/account", auth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Reset daily requests if needed
-    user.resetDailyRequestsIfNeeded();
-    await user.save();
-
     res.json({
       success: true,
       data: {
         user: {
           id: user._id,
           email: user.email,
-          apiKey: user.apiKey,
-          maxRps: user.maxRps,
-          requests: user.requests,
-          dailyRequests: user.dailyRequests,
-          lastResetDate: user.lastResetDate,
           isActive: user.isActive,
+          appCount: user.appCount,
+          isAdmin: user.isAdmin,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
-        },
-        endpoints: {
-          execution: `${req.protocol}://${req.get("host")}/exec/${user.apiKey}`,
-          consensus: `${req.protocol}://${req.get("host")}/cons/${user.apiKey}`,
         },
       },
     });
   } catch (error) {
     console.error("Account info error:", error);
-    res.status(500).json({
-      error: "Internal server error",
-    });
-  }
-});
-
-// Regenerate API key
-router.post("/regenerate-api-key", auth, async (req: AuthRequest, res) => {
-  try {
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(404).json({
-        error: "User not found",
-      });
-    }
-
-    // Generate new API key
-    const newApiKey = user.generateNewApiKey();
-    await user.save();
-
-    res.json({
-      success: true,
-      data: {
-        apiKey: newApiKey,
-        endpoints: {
-          execution: `${req.protocol}://${req.get("host")}/exec/${newApiKey}`,
-          consensus: `${req.protocol}://${req.get("host")}/cons/${newApiKey}`,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("API key regeneration error:", error);
     res.status(500).json({
       error: "Internal server error",
     });
@@ -216,17 +168,20 @@ router.get("/usage", auth, async (req: AuthRequest, res) => {
       });
     }
 
-    const dailyLimit = parseInt(process.env.DEFAULT_DAILY_REQUESTS || "10000");
-
+    // Note: User-level usage stats (totalRequests, dailyRequests, etc.) are removed.
+    // Usage stats are now app-specific.
+    // This route might be deprecated or changed to show aggregated app usage in the future.
+    // For now, it returns basic user info without usage details.
     res.json({
       success: true,
       data: {
-        totalRequests: user.requests,
-        dailyRequests: user.dailyRequests,
-        dailyLimit: dailyLimit,
-        rateLimitRps: user.maxRps,
-        remainingDaily: Math.max(0, dailyLimit - user.dailyRequests),
-        lastResetDate: user.lastResetDate,
+        user: {
+          id: user._id,
+          email: user.email,
+          appCount: user.appCount,
+          isAdmin: user.isAdmin,
+        },
+        message: "User-level usage statistics are deprecated. Please check usage per application.",
       },
     });
   } catch (error) {
