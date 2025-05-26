@@ -260,29 +260,31 @@ git commit -m "feat!: update API response format"
 
 ## 🎯 Contribution Areas
 
-### 🔐 Security & Authentication
+### 🔐 Security & Authentication, App/Chain Management
 
 - OAuth 2.0 / OpenID Connect integration
-- API key rotation mechanisms
-- Advanced rate limiting strategies
+- API key rotation mechanisms (for App-specific API keys)
+- Advanced rate limiting strategies (per-App)
 - Audit logging improvements
 - Security vulnerability fixes
+- Enhancements to App creation/management (e.g., updating App details, rotating an App's API key)
+- Improvements to admin chain management features.
 
 ### 📊 Monitoring & Analytics
 
-- Additional Prometheus metrics
-- Grafana dashboard templates
+- Additional Prometheus metrics (e.g., per-App usage, per-chain request volume)
+- Grafana dashboard templates reflecting App-based metrics
 - Alerting rule definitions
 - Performance optimization
 - Custom monitoring integrations
 
 ### 🌐 Network & Protocols
 
-- WebSocket support
-- Additional blockchain networks
-- Protocol optimizations
-- Connection pooling
-- Load balancing improvements
+- WebSocket support for App API keys
+- Configuration and support for additional blockchain networks via Admin API
+- Protocol optimizations for proxied requests
+- Connection pooling for upstream nodes
+- Load balancing improvements for configured chains
 
 ### 🧪 Testing & Quality
 
