@@ -217,7 +217,99 @@ GET /auth/usage
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-### ⚡ RPC Endpoints
+### 📱 App Management & API Keys
+
+NodeBridge requires users to create "Apps" to obtain API keys. Each App is tied to a specific blockchain (e.g., Sepolia) and has its own unique API key. This allows for granular control and monitoring of access to different chains. Users are typically limited to a certain number of apps (e.g., 5 per user).
+
+#### Create New App (and get API Key)
+
+```bash
+POST /api/v1/apps
+Authorization: Bearer <USER_JWT_TOKEN>
+Content-Type: application/json
+
+{
+  "name": "My First DApp",
+  "description": "Optional description for my app.",
+  "chainName": "Sepolia",
+  "chainId": "11155111"
+}
+```
+
+**Response (Success 201):**
+
+```json
+{
+  "success": true,
+  "message": "App created successfully.",
+  "data": {
+    "app": {
+      "_id": "app_id_here",
+      "name": "My First DApp",
+      "description": "Optional description for my app.",
+      "userId": "user_id_here",
+      "apiKey": "generated_api_key_here",
+      "chainName": "Sepolia",
+      "chainId": "11155111",
+      "maxRps": 20,
+      "dailyRequestsLimit": 10000,
+      "requests": 0,
+      "dailyRequests": 0,
+      "lastResetDate": "2024-03-10T10:00:00.000Z",
+      "isActive": true,
+      "createdAt": "2024-03-10T10:00:00.000Z",
+      "updatedAt": "2024-03-10T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### List User's Apps
+
+```bash
+GET /api/v1/apps
+Authorization: Bearer <USER_JWT_TOKEN>
+```
+
+**Response (Success 200):**
+
+```json
+{
+  "success": true,
+  "message": "User applications retrieved successfully.",
+  "data": {
+    "apps": [
+      {
+        "_id": "app_id_1",
+        "name": "My First DApp",
+        "userId": "user_id_here",
+        "chainName": "Sepolia",
+        "chainId": "11155111",
+        "maxRps": 20,
+        "dailyRequestsLimit": 10000,
+        "isActive": true,
+        "createdAt": "2024-03-10T10:00:00.000Z",
+        "updatedAt": "2024-03-10T10:00:00.000Z"
+        // Note: apiKey is NOT returned in the list view
+      },
+      {
+        "_id": "app_id_2",
+        "name": "Another App",
+        "userId": "user_id_here",
+        "chainName": "Goerli",
+        "chainId": "5",
+        "maxRps": 25,
+        "dailyRequestsLimit": 15000,
+        "isActive": true,
+        "createdAt": "2024-03-09T00:00:00.000Z",
+        "updatedAt": "2024-03-09T00:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### ⚡ RPC Endpoints & API Key Usage
 
 #### Execution Layer (JSON-RPC)
 
@@ -244,6 +336,15 @@ Content-Type: application/json
 - `eth_sendRawTransaction`
 - `eth_call`
 - All standard Ethereum JSON-RPC methods
+
+**API Key Usage Notes:**
+
+- Each API key obtained from creating an "App" is specific to the `chainName` (e.g., "Sepolia") chosen during that app's creation.
+- Requests made with an API key for "Sepolia" will be routed to the Sepolia node infrastructure.
+- Each API key is subject to its own rate limits:
+    - `maxRps`: Maximum requests per second.
+    - `dailyRequestsLimit`: Total requests allowed per day for that specific key.
+- These limits are initially set by system defaults but can be adjusted by an administrator per API key.
 
 #### Consensus Layer (Beacon API)
 
@@ -290,9 +391,14 @@ Returns Prometheus-formatted metrics including:
 
 #### Admin: Node Health
 
+This endpoint now requires a chain name parameter.
+
 ```bash
-GET /admin/node-health
+GET /admin/node-health/:chainName
+Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
+
+**Example:** `GET /admin/node-health/sepolia`
 
 **Response:**
 
@@ -316,9 +422,101 @@ GET /admin/node-health
 
 #### Admin: Node Metrics
 
+This endpoint now requires a chain name parameter.
+
 ```bash
-GET /admin/node-metrics
+GET /admin/node-metrics/:chainName
+Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
+**Example:** `GET /admin/node-metrics/sepolia`
+
+### ⚙️ Additional Admin Management Endpoints
+
+The following endpoints require administrator privileges (Admin JWT Token).
+
+#### Chain Management
+
+- **List All Supported Chains:**
+  ```bash
+  GET /api/v1/admin/chains
+  Authorization: Bearer <ADMIN_JWT_TOKEN>
+  ```
+
+- **Add a New Chain:**
+  ```bash
+  POST /api/v1/admin/chains
+  Authorization: Bearer <ADMIN_JWT_TOKEN>
+  Content-Type: application/json
+
+  {
+    "name": "ChainName",
+    "chainId": "123",
+    "isEnabled": true,
+    "adminNotes": "Optional notes about this chain"
+  }
+  ```
+
+- **Update an Existing Chain:**
+  ```bash
+  PUT /api/v1/admin/chains/:chainIdToUpdate
+  Authorization: Bearer <ADMIN_JWT_TOKEN>
+  Content-Type: application/json
+
+  {
+    "name": "NewChainName",
+    "newChainId": "124",
+    "isEnabled": false,
+    "adminNotes": "Updated notes"
+  }
+  ```
+  *Note: All fields in the request body are optional. Provide only the fields you wish to update. `:chainIdToUpdate` refers to the current `chainId` of the chain to be modified.*
+
+- **Delete a Chain:**
+  ```bash
+  DELETE /api/v1/admin/chains/:chainIdToDelete
+  Authorization: Bearer <ADMIN_JWT_TOKEN>
+  ```
+  *Note: `:chainIdToDelete` refers to the `chainId` of the chain to be deleted.*
+
+#### Default App Settings Management
+
+These settings apply to newly created apps.
+
+- **Get Default App Settings:**
+  ```bash
+  GET /api/v1/admin/settings/app-defaults
+  Authorization: Bearer <ADMIN_JWT_TOKEN>
+  ```
+  *Response includes `defaultMaxRps` and `defaultDailyRequestsLimit`.*
+
+- **Update Default App Settings:**
+  ```bash
+  PUT /api/v1/admin/settings/app-defaults
+  Authorization: Bearer <ADMIN_JWT_TOKEN>
+  Content-Type: application/json
+
+  {
+    "defaultMaxRps": 50,
+    "defaultDailyRequestsLimit": 20000
+  }
+  ```
+
+#### App-Specific Limit Management
+
+Administrators can override the default limits for individual apps.
+
+- **Update Limits for a Specific App:**
+  ```bash
+  PUT /api/v1/admin/apps/:appId/limits
+  Authorization: Bearer <ADMIN_JWT_TOKEN>
+  Content-Type: application/json
+
+  {
+    "maxRps": 100,
+    "dailyRequestsLimit": 50000
+  }
+  ```
+  *Note: `maxRps` and `dailyRequestsLimit` are optional in the request. Provide one or both to update.*
 
 ## 💻 Usage Examples
 
@@ -675,8 +873,10 @@ rpc_gateway/
 | `EXECUTION_RPC_URL`      | Ethereum execution node      | `http://localhost:8545`                | Yes      |
 | `CONSENSUS_API_URL`      | Ethereum consensus node      | `http://localhost:5052`                | Yes      |
 | `PROMETHEUS_URL`         | Prometheus metrics endpoint  | -                                      | No       |
-| `DEFAULT_MAX_RPS`        | Rate limit (requests/second) | `20`                                   | No       |
-| `DEFAULT_DAILY_REQUESTS` | Daily request limit          | `10000`                                | No       |
+| `DEFAULT_MAX_RPS`        | Default rate limit (requests/second) for new apps if not set in DB. Deprecated in favor of DefaultAppSettings model. | `20`                                   | No       |
+| `DEFAULT_DAILY_REQUESTS` | Default daily request limit for new apps if not set in DB. Deprecated in favor of DefaultAppSettings model. | `10000`                                | No       |
+| `FALLBACK_DEFAULT_MAX_RPS` | Fallback RPS for new apps if DefaultAppSettings are not configured in DB. | `20`                                   | No       |
+| `FALLBACK_DEFAULT_DAILY_LIMIT` | Fallback daily limit for new apps if DefaultAppSettings are not configured in DB. | `10000`                                | No       |
 
 ### Development Workflow
 
