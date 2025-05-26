@@ -16,6 +16,7 @@ Welcome to the **NodeBridge RPC Gateway** documentation wiki! This comprehensive
 - [RPC Proxy API](RPC-Proxy-API) - Ethereum execution and consensus layer access
 - [Monitoring API](Monitoring-API) - Health checks and metrics endpoints
 - [Admin API](Admin-API) - Administrative endpoints and node health
+- [Routes Documentation](routes.md) - Detailed list of all API routes
 
 ### 🛠️ **Development**
 
