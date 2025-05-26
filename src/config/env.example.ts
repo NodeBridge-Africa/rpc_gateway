@@ -46,28 +46,30 @@ JWT_SECRET=your-super-secure-jwt-secret-key-here-please-change-this-to-something
 # The prefix (in lowercase) will be used as the chain identifier in API routes (e.g., /ethereum/exec, /sepolia/cons).
 # Supported suffixes:
 #   _EXECUTION_RPC_URL: (Required for execution layer access) URL for the chain's execution layer JSON-RPC endpoint.
+#                       Can be a single URL or a comma-separated list of URLs for load balancing (e.g., "http://node1:8545,http://node2:8545").
 #   _CONSENSUS_API_URL: (Required for consensus layer access) URL for the chain's consensus layer Beacon API endpoint.
+#                       Can be a single URL or a comma-separated list of URLs for load balancing (e.g., "http://beacon1:5052,http://beacon2:5052").
 #   _PROMETHEUS_URL:    (Optional) URL for a Prometheus instance specific to this chain's nodes.
 #
 # At least _EXECUTION_RPC_URL or _CONSENSUS_API_URL must be provided for a chain to be functional.
 
 # Example: Ethereum Mainnet (replace with your actual URLs)
-ETHEREUM_EXECUTION_RPC_URL=http://localhost:8545
-ETHEREUM_CONSENSUS_API_URL=http://localhost:5052
+ETHEREUM_EXECUTION_RPC_URL="http://localhost:8545,http://eth-mainnet-backup:8545"
+ETHEREUM_CONSENSUS_API_URL="http://localhost:5052,http://eth-mainnet-beacon-backup:5052"
 # ETHEREUM_PROMETHEUS_URL=http://localhost:9091
 
 # Example: Sepolia Testnet (using a public provider, replace YOUR_PROJECT_ID)
-SEPOLIA_EXECUTION_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
-SEPOLIA_CONSENSUS_API_URL=https://sepolia-beacon.infura.io/v3/YOUR_INFURA_PROJECT_ID
+SEPOLIA_EXECUTION_RPC_URL="https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID,https://another-sepolia-provider.io/v3/YOUR_OTHER_PROJECT_ID"
+SEPOLIA_CONSENSUS_API_URL="https://sepolia-beacon.infura.io/v3/YOUR_INFURA_PROJECT_ID,https://another-sepolia-beacon-provider.io/v3/YOUR_OTHER_PROJECT_ID"
 # SEPOLIA_PROMETHEUS_URL=
 
 # Example: Holesky Testnet (Execution layer only)
-HOLESKY_EXECUTION_RPC_URL=https://rpc.holesky.ethpandaops.io
+HOLESKY_EXECUTION_RPC_URL="https://rpc.holesky.ethpandaops.io,https://holesky-backup-rpc.example.com"
 # HOLESKY_CONSENSUS_API_URL= (not configured for this example)
 
 # Example: A custom chain named 'ENTERPRISE' (ensure prefix is uppercase in .env)
-# ENTERPRISE_EXECUTION_RPC_URL=http://10.0.0.5:8545
-# ENTERPRISE_CONSENSUS_API_URL=http://10.0.0.5:5052
+# ENTERPRISE_EXECUTION_RPC_URL="http://10.0.0.5:8545,http://10.0.0.6:8545"
+# ENTERPRISE_CONSENSUS_API_URL="http://10.0.0.5:5052,http://10.0.0.6:5052"
 
 # -----------------------------------------------------------------------------
 # Rate Limiting Configuration

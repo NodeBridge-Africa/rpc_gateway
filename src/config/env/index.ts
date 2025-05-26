@@ -31,8 +31,8 @@ for (const key in process.env) {
 // For each discovered chain, validate and store its configuration
 chainNames.forEach(chainName => {
   const chainSpecificSchema = Joi.object({
-    [`${chainName}_EXECUTION_RPC_URL`]: Joi.string().uri().optional(),
-    [`${chainName}_CONSENSUS_API_URL`]: Joi.string().uri().optional(),
+    [`${chainName}_EXECUTION_RPC_URL`]: Joi.string().allow('').optional(),
+    [`${chainName}_CONSENSUS_API_URL`]: Joi.string().allow('').optional(),
     [`${chainName}_PROMETHEUS_URL`]: Joi.string().uri().optional(),
   }).unknown(true); // Allow other env vars
 
@@ -42,9 +42,15 @@ chainNames.forEach(chainName => {
     console.warn(`Validation error for chain ${chainName} config: ${error.message}`);
     allChainConfigs[chainName.toLowerCase()] = {}; // Store empty if validation fails or no vars
   } else {
+    const rawExecUrl = chainEnvVars[`${chainName}_EXECUTION_RPC_URL`];
+    const executionRpcUrl = rawExecUrl ? rawExecUrl.split(',').map(url => url.trim()).filter(url => url) : undefined;
+
+    const rawConsensusApiUrl = chainEnvVars[`${chainName}_CONSENSUS_API_URL`];
+    const consensusApiUrl = rawConsensusApiUrl ? rawConsensusApiUrl.split(',').map(url => url.trim()).filter(url => url) : undefined;
+
     allChainConfigs[chainName.toLowerCase()] = {
-      executionRpcUrl: chainEnvVars[`${chainName}_EXECUTION_RPC_URL`],
-      consensusApiUrl: chainEnvVars[`${chainName}_CONSENSUS_API_URL`],
+      executionRpcUrl: executionRpcUrl && executionRpcUrl.length > 0 ? executionRpcUrl : undefined,
+      consensusApiUrl: consensusApiUrl && consensusApiUrl.length > 0 ? consensusApiUrl : undefined,
       prometheusUrl: chainEnvVars[`${chainName}_PROMETHEUS_URL`],
     };
   }
