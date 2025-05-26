@@ -31,4 +31,5 @@ router.get('/account', auth, authController.getAccountInfo);
 // Get usage statistics
 router.get('/usage', auth, authController.getUsageStats);
 
+
 export default router;
