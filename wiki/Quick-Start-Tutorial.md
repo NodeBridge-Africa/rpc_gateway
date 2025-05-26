@@ -137,7 +137,8 @@ Expected response:
 
 ```bash
 # Replace YOUR_API_KEY with the apiKey from registration
-curl -X POST http://localhost:8888/exec/YOUR_API_KEY \
+# Replace 'sepolia' with your target chain if different
+curl -X POST http://localhost:8888/sepolia/exec/YOUR_API_KEY \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -160,7 +161,9 @@ Expected response:
 ### Test Consensus Layer (Beacon API)
 
 ```bash
-curl http://localhost:8888/cons/YOUR_API_KEY/eth/v1/node/syncing
+# Replace YOUR_API_KEY with the apiKey from registration
+# Replace 'sepolia' with your target chain if different
+curl http://localhost:8888/sepolia/cons/YOUR_API_KEY/eth/v1/node/syncing
 ```
 
 Expected response:
@@ -217,7 +220,8 @@ Congratulations! Your NodeBridge RPC Gateway is now running. Here's what you can
 const Web3 = require("web3");
 
 // Use your NodeBridge gateway
-const web3 = new Web3("http://localhost:8888/exec/YOUR_API_KEY");
+// Replace 'sepolia' with your target chain if different
+const web3 = new Web3("http://localhost:8888/sepolia/exec/YOUR_API_KEY");
 
 async function getLatestBlock() {
   const blockNumber = await web3.eth.getBlockNumber();
@@ -233,7 +237,8 @@ getLatestBlock();
 const { JsonRpcProvider } = require("ethers");
 
 // Use your NodeBridge gateway
-const provider = new JsonRpcProvider("http://localhost:8888/exec/YOUR_API_KEY");
+// Replace 'sepolia' with your target chain if different
+const provider = new JsonRpcProvider("http://localhost:8888/sepolia/exec/YOUR_API_KEY");
 
 async function getNetwork() {
   const network = await provider.getNetwork();

@@ -224,7 +224,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Access standard Ethereum JSON-RPC methods:
 
 ```bash
-POST /exec/<YOUR_API_KEY>
+POST /:chain/exec/<YOUR_API_KEY>
 Content-Type: application/json
 
 {
@@ -250,9 +250,9 @@ Content-Type: application/json
 Access Ethereum consensus layer data:
 
 ```bash
-GET /cons/<YOUR_API_KEY>/eth/v1/beacon/headers
-GET /cons/<YOUR_API_KEY>/eth/v1/beacon/blocks/head
-GET /cons/<YOUR_API_KEY>/eth/v1/node/syncing
+GET /:chain/cons/<YOUR_API_KEY>/eth/v1/beacon/headers
+GET /:chain/cons/<YOUR_API_KEY>/eth/v1/beacon/blocks/head
+GET /:chain/cons/<YOUR_API_KEY>/eth/v1/node/syncing
 ```
 
 ### 📊 Monitoring Endpoints
@@ -291,7 +291,7 @@ Returns Prometheus-formatted metrics including:
 #### Admin: Node Health
 
 ```bash
-GET /admin/node-health
+GET /admin/node-health/:chain
 ```
 
 **Response:**
@@ -317,7 +317,7 @@ GET /admin/node-health
 #### Admin: Node Metrics
 
 ```bash
-GET /admin/node-metrics
+GET /admin/node-metrics/:chain
 ```
 
 ## 💻 Usage Examples
@@ -328,7 +328,7 @@ GET /admin/node-metrics
 const Web3 = require("web3");
 
 // Initialize with your NodeBridge gateway
-const web3 = new Web3("http://localhost:8888/exec/YOUR-API-KEY");
+const web3 = new Web3("http://localhost:8888/ethereum/exec/YOUR-API-KEY");
 
 async function example() {
   // Get latest block number
@@ -349,7 +349,7 @@ async function example() {
 const { JsonRpcProvider } = require("ethers");
 
 // Initialize provider
-const provider = new JsonRpcProvider("http://localhost:8888/exec/YOUR-API-KEY");
+const provider = new JsonRpcProvider("http://localhost:8888/ethereum/exec/YOUR-API-KEY");
 
 async function example() {
   // Get network information
@@ -366,12 +366,12 @@ async function example() {
 
 ```bash
 # Get latest block number
-curl -X POST http://localhost:8888/exec/YOUR-API-KEY \
+curl -X POST http://localhost:8888/ethereum/exec/YOUR-API-KEY \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
 # Get consensus layer sync status
-curl http://localhost:8888/cons/YOUR-API-KEY/eth/v1/node/syncing
+curl http://localhost:8888/ethereum/cons/YOUR-API-KEY/eth/v1/node/syncing
 
 # Check gateway health
 curl http://localhost:8888/health
