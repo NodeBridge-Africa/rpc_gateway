@@ -216,6 +216,200 @@ These routes are for administrative purposes, such as checking node health and m
   curl -X GET http://localhost:8888/admin/node-metrics/sepolia
   ```
 
+### Update App Limits
+- **Method**: `PUT`
+- **Path**: `/admin/apps/:appId/limits`
+- **Description**: Updates the rate limits (maxRps and/or dailyRequestsLimit) for a specific application. Admin access required.
+- **Path Parameters**:
+  - `appId` (string, MongoDB ObjectId): ID of the application to update.
+- **Headers**:
+  - `Authorization: Bearer <ADMIN_JWT_TOKEN>`
+- **Request Body (JSON)**:
+  ```json
+  {
+    "maxRps": 50,
+    "dailyRequestsLimit": 20000
+  }
+  ```
+  *At least one of `maxRps` or `dailyRequestsLimit` must be provided.*
+- **Success Response (200 OK)**:
+  - **Content**: The application object with updated limits.
+  - **Example**:
+    ```json
+    {
+      "success": true,
+      "message": "App limits updated successfully.",
+      "data": {
+        "app": {
+          "_id": "app_id_here",
+          "name": "My Test App",
+          "userId": "user_id_here",
+          "apiKey": "generated_api_key_here",
+          "chainName": "Sepolia",
+          "chainId": "11155111",
+          "maxRps": 50,
+          "dailyRequestsLimit": 20000,
+          "isActive": true,
+          "createdAt": "2024-03-10T10:00:00.000Z",
+          "updatedAt": "2024-03-10T10:00:00.000Z"
+        }
+      }
+    }
+    ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid input (e.g., `appId` not provided, no limits provided, invalid limit values).
+  - `401 Unauthorized`: Missing or invalid admin token.
+  - `403 Forbidden`: Token does not have admin privileges.
+  - `404 Not Found`: Application with the given `appId` not found.
+- **Example cURL**:
+  ```bash
+  curl -X PUT http://localhost:8888/admin/apps/YOUR_APP_ID/limits \
+    -H "Authorization: Bearer YOUR_ADMIN_JWT_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "maxRps": 100,
+      "dailyRequestsLimit": 50000
+    }'
+  ```
+
+### Update App Details
+- **Method**: `PATCH`
+- **Path**: `/admin/apps/:appId`
+- **Description**: Updates details for a specific application. Admin access required.
+- **Path Parameters**:
+  - `appId` (string, MongoDB ObjectId): ID of the application to update.
+- **Headers**:
+  - `Authorization: Bearer <ADMIN_JWT_TOKEN>`
+- **Request Body (JSON)**:
+  - A JSON object containing the fields to update. All fields are optional.
+  - **Updatable Fields**:
+    - `name` (string, min 1, max 100)
+    - `description` (string, max 500, can be empty)
+    - `userId` (string, MongoDB ObjectId, ID of the user owning the app)
+    - `chainName` (string, min 1, max 50)
+    - `chainId` (string, min 1, max 50)
+    - `maxRps` (integer, min 0)
+    - `dailyRequestsLimit` (integer, min 0)
+    - `isActive` (boolean)
+    - `apiKey` (string, UUID v4 - for setting a new specific key. If empty string, it's ignored.)
+    - `requests` (integer, min 0 - for resetting/adjusting counter)
+    - `dailyRequests` (integer, min 0 - for resetting/adjusting counter)
+    - `lastResetDate` (string, ISO 8601 date - for manually triggering a reset)
+  - **Example Request**:
+    ```json
+    {
+      "name": "Updated App Name",
+      "maxRps": 50,
+      "isActive": false
+    }
+    ```
+- **Success Response (200 OK)**:
+  - **Content**: The updated application object.
+  - **Example**:
+    ```json
+    {
+      "success": true,
+      "message": "App details updated successfully.",
+      "data": {
+        "app": {
+          "_id": "app_id_here",
+          "name": "Updated App Name",
+          "description": "Original Description",
+          "userId": "user_id_here",
+          "apiKey": "original_api_key_here",
+          "chainName": "Sepolia",
+          "chainId": "11155111",
+          "maxRps": 50,
+          "dailyRequestsLimit": 1000,
+          "requests": 0,
+          "dailyRequests": 0,
+          "lastResetDate": "2024-03-10T10:00:00.000Z",
+          "isActive": false,
+          "createdAt": "2024-03-10T10:00:00.000Z",
+          "updatedAt": "2024-03-11T12:00:00.000Z"
+        }
+      }
+    }
+    ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid input (e.g., validation error on fields, malformed App ID, empty request body).
+  - `401 Unauthorized`: Missing or invalid admin token.
+  - `403 Forbidden`: Token does not have admin privileges.
+  - `404 Not Found`: Application with the given `appId` not found.
+- **Example cURL**:
+  ```bash
+  curl -X PATCH http://localhost:8888/admin/apps/YOUR_APP_ID \
+    -H "Authorization: Bearer YOUR_ADMIN_JWT_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "My Super DApp Renamed",
+      "isActive": true,
+      "description": "Now with more features!"
+    }'
+  ```
+
+### Update User Details
+- **Method**: `PATCH`
+- **Path**: `/admin/users/:userId`
+- **Description**: Updates details for a specific user. Admin access required.
+- **Path Parameters**:
+  - `userId` (string, MongoDB ObjectId): ID of the user to update.
+- **Headers**:
+  - `Authorization: Bearer <ADMIN_JWT_TOKEN>`
+- **Request Body (JSON)**:
+  - A JSON object containing the fields to update. All fields are optional.
+  - **Updatable Fields**:
+    - `email` (string, valid email format)
+    - `password` (string, min 8, max 128 characters - for changing/setting password)
+    - `isActive` (boolean)
+  - **Example Request**:
+    ```json
+    {
+      "email": "newuseremail@example.com",
+      "isActive": true
+    }
+    ```
+- **Success Response (200 OK)**:
+  - **Content**: The updated user object (password field will be excluded).
+  - **Example**:
+    ```json
+    {
+      "success": true,
+      "message": "User details updated successfully.",
+      "data": {
+        "user": {
+          "_id": "user_id_here",
+          "email": "newuseremail@example.com",
+          "isActive": true,
+          "apiKey": "user_api_key_here", 
+          "maxRps": 20, 
+          "dailyRequestsLimit": 10000, 
+          "requests": 0,
+          "dailyRequests": 0,
+          "lastResetDate": "2024-03-10T00:00:00.000Z",
+          "createdAt": "2024-03-10T00:00:00.000Z",
+          "updatedAt": "2024-03-11T13:00:00.000Z"
+        }
+      }
+    }
+    ```
+- **Error Responses**:
+  - `400 Bad Request`: Invalid input (e.g., validation error, malformed User ID, empty request body, empty password string).
+  - `401 Unauthorized`: Missing or invalid admin token.
+  - `403 Forbidden`: Token does not have admin privileges.
+  - `404 Not Found`: User with the given `userId` not found.
+  - `409 Conflict`: If trying to update email to one that already exists.
+- **Example cURL**:
+  ```bash
+  curl -X PATCH http://localhost:8888/admin/users/USER_ID_TO_UPDATE \
+    -H "Authorization: Bearer YOUR_ADMIN_JWT_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "isActive": false,
+      "email": "deactivated.user@example.com"
+    }'
+  ```
+
 ## Proxy Routes (`src/routes/proxy.routes.ts`)
 
 These routes proxy requests to your Ethereum execution and consensus layer nodes. They require an API key.

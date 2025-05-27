@@ -3,6 +3,7 @@ import axios from 'axios';
 import { config } from '../../config'; // Import the new config
 import Chain from '../models/chain.model';
 import App from '../models/app.model'; // Import App model
+import User from '../models/user.model'; // Import User model
 import { successResponse, errorResponse } from '../utils/responseHandler';
 
 // Helper function (can be a private static method or defined within the class methods if preferred)
@@ -406,6 +407,163 @@ export class AdminController {
            errorResponse(res, 400, 'Validation error.', { details: (error as Error).message });
       } else {
            errorResponse(res, 500, 'Internal server error while updating app limits.', { details: (error as Error).message });
+      }
+    }
+  }
+
+  /**
+   * Updates details for a specific application.
+   * @param req Express request object. Expects `appId` in params, and
+   *            various app fields in the body.
+   * @param res Express response object.
+   */
+  public async updateAppDetails(req: Request, res: Response): Promise<void> {
+    try {
+      const { appId } = req.params;
+      const updateData = req.body;
+
+      if (!appId) {
+        errorResponse(res, 400, 'App ID must be provided in the URL path.');
+        return;
+      }
+
+      const allowedAppFields = [
+        'name', 'description', 'userId', 'chainName', 'chainId', 
+        'maxRps', 'dailyRequestsLimit', 'isActive', 'apiKey', 
+        'requests', 'dailyRequests', 'lastResetDate'
+      ];
+      
+      const filteredUpdateData: any = {};
+      for (const key in updateData) {
+        if (allowedAppFields.includes(key) && updateData[key] !== undefined) {
+          // Special handling for apiKey: if provided as empty string, treat as undefined
+          // to prevent setting an empty API key. Actual regeneration should be a separate endpoint.
+          if (key === 'apiKey' && updateData[key] === '') {
+            continue; 
+          }
+          filteredUpdateData[key] = updateData[key];
+        }
+      }
+
+      if (Object.keys(filteredUpdateData).length === 0) {
+        errorResponse(res, 400, 'No valid fields provided for update.');
+        return;
+      }
+      
+      // If apiKey is being updated, ensure it's a valid format (e.g., UUID)
+      // This should ideally be handled by Joi validation layer before this controller.
+      // For now, we assume if it's present in filteredUpdateData, it's valid.
+
+      const app = await App.findByIdAndUpdate(
+        appId,
+        { $set: filteredUpdateData },
+        { new: true, runValidators: true }
+      );
+
+      if (!app) {
+        errorResponse(res, 404, `App with ID '${appId}' not found.`);
+        return;
+      }
+
+      successResponse(res, 200, 'App details updated successfully.', { app });
+
+    } catch (error) {
+      console.error('Error updating app details:', error);
+      if ((error as any).name === 'CastError' && (error as any).path === '_id') {
+        errorResponse(res, 400, 'Invalid App ID format.');
+      } else if ((error as any).name === 'ValidationError') {
+        errorResponse(res, 400, 'Validation error.', { details: (error as Error).message });
+      } else {
+        errorResponse(res, 500, 'Internal server error while updating app details.', { details: (error as Error).message });
+      }
+    }
+  }
+
+  /**
+   * Updates details for a specific user.
+   * @param req Express request object. Expects `userId` in params, and
+   *            { email?, password?, isActive? } in the body.
+   * @param res Express response object.
+   */
+  public async updateUserDetails(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const updateData = req.body;
+
+      if (!userId) {
+        errorResponse(res, 400, 'User ID must be provided in the URL path.');
+        return;
+      }
+
+      const allowedUserFields = ['email', 'password', 'isActive'];
+      const filteredUpdateData: any = {};
+      for (const key in updateData) {
+        if (allowedUserFields.includes(key) && updateData[key] !== undefined) {
+          // Ensure password is not an empty string if provided
+          if (key === 'password' && updateData[key] === '') {
+            errorResponse(res, 400, 'Password cannot be an empty string.');
+            return;
+          }
+          filteredUpdateData[key] = updateData[key];
+        }
+      }
+
+      if (Object.keys(filteredUpdateData).length === 0) {
+        errorResponse(res, 400, 'No valid fields provided for update.');
+        return;
+      }
+
+      if (filteredUpdateData.password) {
+        const user = await User.findById(userId);
+        if (!user) {
+          errorResponse(res, 404, `User with ID '${userId}' not found.`);
+          return;
+        }
+
+        if (filteredUpdateData.email !== undefined) {
+          user.email = filteredUpdateData.email;
+        }
+        if (filteredUpdateData.isActive !== undefined) {
+          user.isActive = filteredUpdateData.isActive;
+        }
+        user.password = filteredUpdateData.password; // pre-save hook will hash
+
+        await user.save();
+        // user.toJSON() is automatically called by Express res.json() if User model schema has toJSON transform
+        // but to be explicit and ensure password is not in the returned object from this method:
+        const userObject = user.toObject(); // Or toJSON(), depending on Mongoose setup
+        delete userObject.password; 
+        
+        successResponse(res, 200, 'User details updated successfully.', { user: userObject });
+      
+      } else {
+        // No password update, can use findByIdAndUpdate
+        const user = await User.findByIdAndUpdate(
+          userId,
+          { $set: filteredUpdateData },
+          { new: true, runValidators: true }
+        );
+
+        if (!user) {
+          errorResponse(res, 404, `User with ID '${userId}' not found.`);
+          return;
+        }
+        const userObject = user.toObject();
+        delete userObject.password;
+
+        successResponse(res, 200, 'User details updated successfully.', { user: userObject });
+      }
+
+    } catch (error) {
+      console.error('Error updating user details:', error);
+      if ((error as any).code === 11000) { // Mongoose duplicate key error for email
+        errorResponse(res, 409, 'Email address is already in use by another account.');
+      } else if ((error as any).name === 'CastError' && (error as any).path === '_id') {
+        errorResponse(res, 400, 'Invalid User ID format.');
+      } else if ((error as any).name === 'ValidationError') {
+        errorResponse(res, 400, 'Validation error.', { details: (error as Error).message });
+      } else {
+        errorResponse(res, 500, 'Internal server error while updating user details.', { details: (error as Error).message });
       }
     }
   }
