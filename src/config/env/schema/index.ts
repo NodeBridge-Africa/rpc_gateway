@@ -4,6 +4,7 @@ import { Joi } from "celebrate";
 export const schema = {
   PORT: Joi.number().required(),
   JWT_SECRET: Joi.string().required(),
+  MONGO_URI: Joi.string().required(),
   // PROMETHEUS_URL: Joi.string().required(), // Removed: Handled by chain-specific config
   // EXECUTION_RPC_URL: Joi.string().required(), // Removed: Handled by chain-specific config
   // CONSENSUS_API_URL: Joi.string().required(), // Removed: Handled by chain-specific config

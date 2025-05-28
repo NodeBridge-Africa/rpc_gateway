@@ -9,6 +9,7 @@ export interface AllChainConfigs {
 }
 
 export type ConfigTypes = {
+  MONGO_URI: string;
   PORT: number;
   JWT_SECRET: string;
   // These will be removed as they are replaced by chain-specific configs

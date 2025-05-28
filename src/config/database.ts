@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
-import { validateEnv } from "./env.example";
-
+import { config } from "./env";
 export class DatabaseConfig {
   private static instance: DatabaseConfig;
   private isConnected: boolean = false;
@@ -21,18 +20,7 @@ export class DatabaseConfig {
     }
 
     try {
-      // Validate environment variables
-      validateEnv();
-
-      const mongoUri = process.env.MONGO_URI!;
-
-      // const options: mongoose.ConnectOptions = {
-      //   maxPoolSize: 10, // Maintain up to 10 socket connections
-      //   serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      //   socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      //   bufferCommands: false, // Disable mongoose buffering
-      //   // bufferMaxEntries: 0, // Disable mongoose buffering
-      // };
+      const mongoUri = config.MONGO_URI;
 
       await mongoose.connect(mongoUri);
 

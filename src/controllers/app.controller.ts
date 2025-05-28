@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
-import App, { IApp } from '../models/app.model';
-import User, { IUser } from '../models/user.model';
-import Chain from '../models/chain.model'; // Assuming chain.model.ts is created
-import DefaultAppSettings from '../models/defaultAppSettings.model'; // Added import
-import { successResponse, errorResponse } from '../utils/responseHandler'; // Assuming you have this
-import { v4 as uuid } from 'uuid'; // For API key generation if not handled by schema default
+import { Request, Response } from "express";
+import App, { IApp } from "../models/app.model";
+import User, { IUser } from "../models/user.model";
+import Chain from "../models/chain.model"; // Assuming chain.model.ts is created
+import DefaultAppSettings from "../models/defaultAppSettings.model"; // Added import
+import { successResponse, errorResponse } from "../utils/responseHandler"; // Assuming you have this
+import { v4 as uuid } from "uuid"; // For API key generation if not handled by schema default
 
 const MAX_APPS_PER_USER = 5;
 // const DEFAULT_MAX_RPS = parseInt(process.env.DEFAULT_MAX_RPS || "20"); // This is now sourced from DefaultAppSettings
@@ -23,26 +23,42 @@ export class AppController {
       const userId = (req.user as IUser)?._id; // Assuming user is attached by auth middleware
 
       if (!userId) {
-        errorResponse(res, 403, 'User not authenticated.');
+        errorResponse(res, 403, "User not authenticated.");
         return;
       }
 
       if (!name || !chainName || !chainId) {
-        errorResponse(res, 400, 'Missing required fields: name, chainName, chainId.');
+        errorResponse(
+          res,
+          400,
+          "Missing required fields: name, chainName, chainId."
+        );
         return;
       }
 
       // Check app limit for the user
       const appCount = await App.countDocuments({ userId });
       if (appCount >= MAX_APPS_PER_USER) {
-        errorResponse(res, 403, `User cannot create more than ${MAX_APPS_PER_USER} apps.`);
+        errorResponse(
+          res,
+          403,
+          `User cannot create more than ${MAX_APPS_PER_USER} apps.`
+        );
         return;
       }
 
       // Verify chain existence and if it's enabled
-      const chain = await Chain.findOne({ name: chainName, chainId: chainId, isEnabled: true });
+      const chain = await Chain.findOne({
+        name: chainName,
+        chainId: chainId,
+        isEnabled: true,
+      });
       if (!chain) {
-        errorResponse(res, 404, `Chain '${chainName}' with chainId '${chainId}' not found or is not enabled.`);
+        errorResponse(
+          res,
+          404,
+          `Chain '${chainName}' with chainId '${chainId}' not found or is not enabled.`
+        );
         return;
       }
 
@@ -59,9 +75,13 @@ export class AppController {
         // use hardcoded or environment-variable-based fallbacks.
         // This situation should be unlikely if the DefaultAppSettingsController.getDefaultAppSettings
         // endpoint has been called at least once, as it creates initial settings.
-        console.warn('DefaultAppSettings not found. Falling back to environment/hardcoded defaults for new app.');
-        appMaxRps = parseInt(process.env.FALLBACK_DEFAULT_MAX_RPS || '20'); 
-        appDailyRequestsLimit = parseInt(process.env.FALLBACK_DEFAULT_DAILY_LIMIT || '10000');
+        console.warn(
+          "DefaultAppSettings not found. Falling back to environment/hardcoded defaults for new app."
+        );
+        appMaxRps = parseInt(process.env.FALLBACK_DEFAULT_MAX_RPS || "20");
+        appDailyRequestsLimit = parseInt(
+          process.env.FALLBACK_DEFAULT_DAILY_LIMIT || "10000"
+        );
       }
 
       const newApp = new App({
@@ -77,11 +97,16 @@ export class AppController {
       });
 
       await newApp.save();
-      successResponse(res, 201, 'App created successfully.', { app: newApp });
-
+      successResponse(res, 201, {
+        message: "App created successfully.",
+        app: newApp,
+      });
     } catch (error) {
-      console.error('Error creating app:', error);
-      errorResponse(res, 500, 'Internal server error while creating app.', { details: (error as Error).message });
+      console.error("Error creating app:", error);
+      errorResponse(res, 500, {
+        message: "Internal server error while creating app.",
+        details: (error as Error).message,
+      });
     }
   }
 
@@ -93,19 +118,24 @@ export class AppController {
    */
   public async getUserApps(req: Request, res: Response): Promise<void> {
     try {
-        const userId = (req.user as IUser)?._id;
+      const userId = (req.user as IUser)?._id;
 
-        if (!userId) {
-            errorResponse(res, 403, 'User not authenticated.');
-            return;
-        }
+      if (!userId) {
+        errorResponse(res, 403, "User not authenticated.");
+        return;
+      }
 
-        const apps = await App.find({ userId }).select('-apiKey'); // Exclude API key from general listing
-        successResponse(res, 200, 'User applications retrieved successfully.', { apps });
-
+      const apps = await App.find({ userId }).select("-apiKey"); // Exclude API key from general listing
+      successResponse(res, 200, {
+        message: "User applications retrieved successfully.",
+        apps,
+      });
     } catch (error) {
-        console.error('Error retrieving user apps:', error);
-        errorResponse(res, 500, 'Internal server error while retrieving apps.', { details: (error as Error).message });
+      console.error("Error retrieving user apps:", error);
+      errorResponse(res, 500, {
+        message: "Internal server error while retrieving apps.",
+        details: (error as Error).message,
+      });
     }
   }
 }

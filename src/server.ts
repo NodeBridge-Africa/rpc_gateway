@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import { validateEnv } from "./config/env.example";
 import database from "./config/database";
 import authRoutes from "./routes/auth.routes";
 import proxyRoutes from "./routes/proxy.routes";
@@ -16,9 +15,6 @@ import {
 
 async function startServer() {
   try {
-    // Validate environment variables
-    validateEnv();
-
     // Connect to database
     await database.connect();
 

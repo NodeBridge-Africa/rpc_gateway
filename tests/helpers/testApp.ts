@@ -7,7 +7,6 @@ import {
   metricsMiddleware,
   getMetrics,
 } from "../../src/services/metrics.service";
-import prom from "prom-client";
 
 // Create test app without database connection
 export function createTestApp() {

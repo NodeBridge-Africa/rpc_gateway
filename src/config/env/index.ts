@@ -8,7 +8,7 @@ dotenv.config();
 
 // --- Dynamic Chain Configuration Logic ---
 const allChainConfigs: AllChainConfigs = {};
-const chainNames = new Set<string>();
+const chainNames = new Map<string, string>(); // Map from lowercase chain name to original case
 const chainVarSuffixes = [
   "_EXECUTION_RPC_URL",
   "_CONSENSUS_API_URL",
@@ -20,38 +20,86 @@ for (const key in process.env) {
   for (const suffix of chainVarSuffixes) {
     if (key.endsWith(suffix)) {
       const chain = key.replace(suffix, "");
-      if (chain && !chain.startsWith("DEFAULT_")) { // Avoid picking up legacy/default vars if any
-        chainNames.add(chain.toUpperCase());
+      // Exclude DEFAULT prefixed variables and ensure chain name is not empty
+      if (chain && chain !== "DEFAULT") {
+        chainNames.set(chain.toLowerCase(), chain); // Store original case
       }
-      break; 
+      break;
     }
   }
 }
 
 // For each discovered chain, validate and store its configuration
-chainNames.forEach(chainName => {
+chainNames.forEach((originalChainName, lowerChainName) => {
   const chainSpecificSchema = Joi.object({
-    [`${chainName}_EXECUTION_RPC_URL`]: Joi.string().allow('').optional(),
-    [`${chainName}_CONSENSUS_API_URL`]: Joi.string().allow('').optional(),
-    [`${chainName}_PROMETHEUS_URL`]: Joi.string().uri().optional(),
+    [`${originalChainName}_EXECUTION_RPC_URL`]: Joi.string()
+      .allow("")
+      .optional(),
+    [`${originalChainName}_CONSENSUS_API_URL`]: Joi.string()
+      .allow("")
+      .optional(),
+    [`${originalChainName}_PROMETHEUS_URL`]: Joi.string()
+      .custom((value, helpers) => {
+        // Allow comma-separated list of URIs
+        const urls = value.split(",").map((url: string) => url.trim());
+        for (const url of urls) {
+          if (!Joi.attempt(url, Joi.string().uri())) {
+            return helpers.error("any.invalid");
+          }
+        }
+        return value;
+      }, "Comma-separated URI validation")
+      .optional(),
   }).unknown(true); // Allow other env vars
 
-  const { error, value: chainEnvVars } = chainSpecificSchema.validate(process.env, { stripUnknown: false });
+  const { error, value: chainEnvVars } = chainSpecificSchema.validate(
+    process.env,
+    { stripUnknown: false }
+  );
   if (error) {
     // Log warning or handle as per project's error strategy for optional chain configs
-    console.warn(`Validation error for chain ${chainName} config: ${error.message}`);
-    allChainConfigs[chainName.toLowerCase()] = {}; // Store empty if validation fails or no vars
+    console.warn(
+      `Validation error for chain ${originalChainName} config: ${error.message}`
+    );
+    allChainConfigs[lowerChainName] = {}; // Store empty if validation fails or no vars
   } else {
-    const rawExecUrl = chainEnvVars[`${chainName}_EXECUTION_RPC_URL`];
-    const executionRpcUrl = rawExecUrl ? rawExecUrl.split(',').map(url => url.trim()).filter(url => url) : undefined;
+    const rawExecUrl = chainEnvVars[`${originalChainName}_EXECUTION_RPC_URL`];
+    const executionRpcUrl = rawExecUrl
+      ? rawExecUrl
+          .split(",")
+          .map((url: string) => url.trim())
+          .filter((url: string) => url)
+      : undefined;
 
-    const rawConsensusApiUrl = chainEnvVars[`${chainName}_CONSENSUS_API_URL`];
-    const consensusApiUrl = rawConsensusApiUrl ? rawConsensusApiUrl.split(',').map(url => url.trim()).filter(url => url) : undefined;
+    const rawConsensusApiUrl =
+      chainEnvVars[`${originalChainName}_CONSENSUS_API_URL`];
+    const consensusApiUrl = rawConsensusApiUrl
+      ? rawConsensusApiUrl
+          .split(",")
+          .map((url: string) => url.trim())
+          .filter((url: string) => url)
+      : undefined;
 
-    allChainConfigs[chainName.toLowerCase()] = {
-      executionRpcUrl: executionRpcUrl && executionRpcUrl.length > 0 ? executionRpcUrl : undefined,
-      consensusApiUrl: consensusApiUrl && consensusApiUrl.length > 0 ? consensusApiUrl : undefined,
-      prometheusUrl: chainEnvVars[`${chainName}_PROMETHEUS_URL`],
+    const rawPrometheusUrl =
+      chainEnvVars[`${originalChainName}_PROMETHEUS_URL`];
+    const prometheusUrl = rawPrometheusUrl
+      ? rawPrometheusUrl
+          .split(",")
+          .map((url: string) => url.trim())
+          .filter((url: string) => url)
+      : undefined;
+
+    allChainConfigs[lowerChainName] = {
+      executionRpcUrl:
+        executionRpcUrl && executionRpcUrl.length > 0
+          ? executionRpcUrl
+          : undefined,
+      consensusApiUrl:
+        consensusApiUrl && consensusApiUrl.length > 0
+          ? consensusApiUrl
+          : undefined,
+      prometheusUrl:
+        prometheusUrl && prometheusUrl.length > 0 ? prometheusUrl : undefined,
     };
   }
 });
@@ -60,24 +108,20 @@ export function getChainConfig(chainName: string): ChainConfig | undefined {
   return allChainConfigs[chainName.toLowerCase()];
 }
 
-// --- Original Config Validation (for non-chain specific vars) ---
-// Assuming 'schema' from './schema' defines PORT, JWT_SECRET etc.
-// And does NOT define the old EXECUTION_RPC_URL, CONSENSUS_API_URL, PROMETHEUS_URL
-const { error: baseError, value: baseEnvVariables } = Validate(baseSchema).validate(
-  process.env
-);
-
-if (baseError) {
-  throw new Error(`Base config validation error: ${baseError.message}`);
+function buildConfig(): ConfigTypes {
+  const { error, value: baseEnvVariables } = Validate(baseSchema).validate(
+    process.env
+  );
+  if (error) {
+    throw new Error(`Base config validation error: ${error.message}`);
+  }
+  return {
+    MONGO_URI: baseEnvVariables.MONGO_URI,
+    PORT: baseEnvVariables.PORT,
+    JWT_SECRET: baseEnvVariables.JWT_SECRET,
+    allChainConfigs,
+    getChainConfig,
+  };
 }
 
-export const config: ConfigTypes = {
-  PORT: baseEnvVariables.PORT,
-  JWT_SECRET: baseEnvVariables.JWT_SECRET,
-  allChainConfigs,
-  getChainConfig,
-  // The following are removed as per task, assuming they were in baseSchema
-  // PROMETHEUS_URL: baseEnvVariables.PROMETHEUS_URL, // To be removed from schema.ts
-  // EXECUTION_RPC_URL: baseEnvVariables.EXECUTION_RPC_URL, // To be removed from schema.ts
-  // CONSENSUS_API_URL: baseEnvVariables.CONSENSUS_API_URL, // To be removed from schema.ts
-};
+export const config = buildConfig();

@@ -6,8 +6,8 @@ import {
   recordRpcMetrics,
   recordRateLimitHit,
 } from "../services/metrics.service";
-import { ProxyController } from '../controllers/proxy.controller';
-import { config } from '../../config'; // Import config
+import { ProxyController } from "../controllers/proxy.controller";
+import { config } from "../config"; // Import config
 
 const router = Router();
 const proxyController = new ProxyController();
@@ -19,12 +19,13 @@ const createRpcProxy = (
   endpointType: "execution" | "consensus"
 ) => {
   const pathRewriteRules: { [key: string]: string } = {};
-  if (endpointType === 'execution') {
+  if (endpointType === "execution") {
     // Matches /<chainName>/exec/<apiKey>/<actual_path_to_node>
     // Rewrites to /<actual_path_to_node> for the target node
-    pathRewriteRules[`^/${chainName}/exec/[^/]+`] = '';
-  } else { // consensus
-    pathRewriteRules[`^/${chainName}/cons/[^/]+`] = '';
+    pathRewriteRules[`^/${chainName}/exec/[^/]+`] = "";
+  } else {
+    // consensus
+    pathRewriteRules[`^/${chainName}/cons/[^/]+`] = "";
   }
 
   return createProxyMiddleware({
@@ -42,7 +43,10 @@ const createRpcProxy = (
 
       // Log the request
       console.log(
-        `[${chainName.toUpperCase()}-${endpointType.toUpperCase()}] ${req.method} ${req.url} - User: ${ // Added chainName to log
+        `[${chainName.toUpperCase()}-${endpointType.toUpperCase()}] ${
+          req.method
+        } ${req.url} - User: ${
+          // Added chainName to log
           req.user?.email || "unknown"
         }`
       );
@@ -77,7 +81,8 @@ const createRpcProxy = (
       res.setHeader("X-Response-Time", `${duration}s`);
 
       console.log(
-        `[${chainName.toUpperCase()}-${endpointType.toUpperCase()}] Response: ${ // Added chainName to log
+        `[${chainName.toUpperCase()}-${endpointType.toUpperCase()}] Response: ${
+          // Added chainName to log
           proxyRes.statusCode
         } - ${duration}s`
       );
@@ -97,10 +102,16 @@ const createRpcProxy = (
 };
 
 // Enhanced rate limiting with metrics
-const rateLimitWithMetrics = (req: Request, res: Response, next: NextFunction) => { // Typed req, res, next
+const rateLimitWithMetrics = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  // Typed req, res, next
   const originalSend = res.status;
   res.status = function (statusCode: number) {
-    if (statusCode === 429 && (req as any).user && (req as any).apiKey) { // Type assertion for req.user/req.apiKey
+    if (statusCode === 429 && (req as any).user && (req as any).apiKey) {
+      // Type assertion for req.user/req.apiKey
       recordRateLimitHit((req as any).user._id.toString(), (req as any).apiKey);
     }
     return originalSend.call(this, statusCode);
@@ -111,31 +122,57 @@ const rateLimitWithMetrics = (req: Request, res: Response, next: NextFunction) =
 
 // Execution layer proxy routes (JSON-RPC)
 // /:chain/exec/<API_KEY>/...
-router.use("/:chain/exec/:key", apiKeyGuard, rateLimitWithMetrics, (req: Request, res: Response, next: NextFunction) => {
-  const chainName = req.params.chain.toLowerCase();
-  const chainConfig = config.getChainConfig(chainName);
+router.use(
+  "/:chain/exec/:key",
+  apiKeyGuard,
+  rateLimitWithMetrics,
+  (req: Request, res: Response, next: NextFunction) => {
+    const chainName = req.params.chain.toLowerCase();
+    const chainConfig = config.getChainConfig(chainName);
 
-  if (!chainConfig?.executionRpcUrl) {
-    return res.status(404).json({ error: `Execution RPC URL not configured for chain ${chainName}` });
+    if (!chainConfig?.executionRpcUrl) {
+      return res
+        .status(404)
+        .json({
+          error: `Execution RPC URL not configured for chain ${chainName}`,
+        });
+    }
+    const executionProxyInstance = createRpcProxy(
+      chainConfig.executionRpcUrl,
+      chainName,
+      "execution"
+    );
+    executionProxyInstance(req, res, next);
   }
-  const executionProxyInstance = createRpcProxy(chainConfig.executionRpcUrl, chainName, 'execution');
-  executionProxyInstance(req, res, next);
-});
+);
 
 // Consensus layer proxy routes (REST API)
 // /:chain/cons/<API_KEY>/...
-router.use("/:chain/cons/:key", apiKeyGuard, rateLimitWithMetrics, (req: Request, res: Response, next: NextFunction) => {
-  const chainName = req.params.chain.toLowerCase();
-  const chainConfig = config.getChainConfig(chainName);
+router.use(
+  "/:chain/cons/:key",
+  apiKeyGuard,
+  rateLimitWithMetrics,
+  (req: Request, res: Response, next: NextFunction) => {
+    const chainName = req.params.chain.toLowerCase();
+    const chainConfig = config.getChainConfig(chainName);
 
-  if (!chainConfig?.consensusApiUrl) {
-    return res.status(404).json({ error: `Consensus API URL not configured for chain ${chainName}` });
+    if (!chainConfig?.consensusApiUrl) {
+      return res
+        .status(404)
+        .json({
+          error: `Consensus API URL not configured for chain ${chainName}`,
+        });
+    }
+    const consensusProxyInstance = createRpcProxy(
+      chainConfig.consensusApiUrl,
+      chainName,
+      "consensus"
+    );
+    consensusProxyInstance(req, res, next);
   }
-  const consensusProxyInstance = createRpcProxy(chainConfig.consensusApiUrl, chainName, 'consensus');
-  consensusProxyInstance(req, res, next);
-});
+);
 
 // Health check endpoint for proxied services
-router.get('/health/:chain', proxyController.checkProxyHealth); // Updated this line
+router.get("/health/:chain", proxyController.checkProxyHealth); // Updated this line
 
 export default router;
