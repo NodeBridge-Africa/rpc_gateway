@@ -1,11 +1,9 @@
 import request from "supertest";
 import express from "express";
-import mongoose from "mongoose";
-import User, { IUser } from "../../../src/models/user.model";
+import User from "../../../src/models/user.model";
 import Chain, { IChain } from "../../../src/models/chain.model";
 import adminRoutes from "../../../src/routes/admin.routes"; // The router for /api/v1/admin
 import { MongoMemoryServer } from "mongodb-memory-server";
-import jwt from "jsonwebtoken";
 import database from "../../../src/config/database";
 
 // Mocking the auth middleware to simulate admin and non-admin users

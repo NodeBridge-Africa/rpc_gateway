@@ -1,6 +1,7 @@
-import { Router } from 'express';
-import { DefaultAppSettingsController } from '../controllers/defaultAppSettings.controller';
-import { auth } from '../auth/auth'; // Assuming this is your JWT auth middleware
+import { Router } from "express";
+import { DefaultAppSettingsController } from "../controllers/defaultAppSettings.controller";
+import { auth } from "../auth/auth"; // Assuming this is your JWT auth middleware
+import { adminOnly } from "../middlewares/adminOnly"; // Import adminOnly middleware
 // import { adminAuth } from '../middlewares/adminAuth.middleware'; // If you have a specific admin middleware
 
 const router = Router();
@@ -12,7 +13,7 @@ const controller = new DefaultAppSettingsController();
 // For this task, we assume 'auth' middleware is sufficient, or an admin check
 // would be part of the 'auth' middleware or a subsequent one not specified here.
 
-router.get('/', auth, controller.getDefaultAppSettings); // Consider adminAuth here
-router.put('/', auth, controller.updateDefaultAppSettings); // Consider adminAuth here
+router.get("/", auth, adminOnly, controller.getDefaultAppSettings);
+router.put("/", auth, adminOnly, controller.updateDefaultAppSettings);
 
 export default router;

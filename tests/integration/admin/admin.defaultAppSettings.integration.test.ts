@@ -5,26 +5,36 @@ import User from "../../../src/models/user.model";
 import defaultAppSettingsRoutes from "../../../src/routes/defaultAppSettings.routes";
 import DefaultAppSettings from "../../../src/models/defaultAppSettings.model";
 
-// Custom test auth middleware
-const testAuthMiddleware = (req: any, res: any, next: any) => {
-  // Use headers to determine user context for tests
-  const authHeader = req.headers.authorization || "";
-  if (authHeader.startsWith("Bearer admin-testtoken")) {
-    req.user = { _id: adminUserId, isAdmin: true };
-    return next();
-  } else if (authHeader.startsWith("Bearer user-testtoken")) {
-    req.user = { _id: regularUserId, isAdmin: false };
-    return next();
+// Mock the auth middleware before imports
+jest.mock("../../../src/auth/auth");
+
+// After imports, we can require the mocked module and set up the implementation
+import { auth } from "../../../src/auth/auth";
+
+// Declare variables at module level
+let adminUserId: string;
+let regularUserId: string;
+
+// Set up the mock implementation
+(auth as jest.MockedFunction<typeof auth>).mockImplementation(
+  (req: any, res: any, next: any) => {
+    // Use headers to determine user context for tests
+    const authHeader = req.headers.authorization || "";
+    if (authHeader.startsWith("Bearer admin-testtoken")) {
+      req.user = { _id: adminUserId, isAdmin: true };
+      return next();
+    } else if (authHeader.startsWith("Bearer user-testtoken")) {
+      req.user = { _id: regularUserId, isAdmin: false };
+      return next();
+    }
+    return res.status(401).json({ message: "Request not authenticated" });
   }
-  return res
-    .status(401)
-    .json({ message: "Unauthorized from test auth middleware" });
-};
+);
 
 const setupExpressApp = () => {
   const testApp = express();
   testApp.use(express.json());
-  testApp.use(testAuthMiddleware); // Use custom test auth middleware
+
   testApp.use("/api/v1/admin/settings/app-defaults", defaultAppSettingsRoutes);
   testApp.use((err: any, req: any, res: any, next: any) => {
     console.error("Unhandled error in defaultAppSettings test app:", err);
@@ -38,8 +48,6 @@ const setupExpressApp = () => {
 let expressApp: express.Application;
 let adminUserToken: string;
 let regularUserToken: string;
-let adminUserId: string;
-let regularUserId: string;
 
 describe("Admin Default App Settings Integration Tests (/api/v1/admin/settings/app-defaults)", () => {
   beforeAll(async () => {
@@ -81,9 +89,9 @@ describe("Admin Default App Settings Integration Tests (/api/v1/admin/settings/a
         .set("Authorization", `Bearer ${adminUserToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.settings.defaultMaxRps).toBe(20);
-      expect(response.body.data.settings.defaultDailyRequestsLimit).toBe(10000);
+      expect(response.body.message).toBeDefined();
+      expect(response.body.settings.defaultMaxRps).toBe(20);
+      expect(response.body.settings.defaultDailyRequestsLimit).toBe(10000);
     });
 
     it("should return existing settings if they are already in the DB", async () => {
@@ -97,8 +105,8 @@ describe("Admin Default App Settings Integration Tests (/api/v1/admin/settings/a
         .set("Authorization", `Bearer ${adminUserToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.data.settings.defaultMaxRps).toBe(30);
-      expect(response.body.data.settings.defaultDailyRequestsLimit).toBe(15000);
+      expect(response.body.settings.defaultMaxRps).toBe(30);
+      expect(response.body.settings.defaultDailyRequestsLimit).toBe(15000);
     });
 
     it("should deny access to non-admin users (401)", async () => {
@@ -118,11 +126,9 @@ describe("Admin Default App Settings Integration Tests (/api/v1/admin/settings/a
         .send(updates);
 
       expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.settings.defaultMaxRps).toBe(
-        updates.defaultMaxRps
-      );
-      expect(response.body.data.settings.defaultDailyRequestsLimit).toBe(
+      expect(response.body.message).toBeDefined();
+      expect(response.body.settings.defaultMaxRps).toBe(updates.defaultMaxRps);
+      expect(response.body.settings.defaultDailyRequestsLimit).toBe(
         updates.defaultDailyRequestsLimit
       );
 
@@ -143,9 +149,7 @@ describe("Admin Default App Settings Integration Tests (/api/v1/admin/settings/a
       expect(response.status).toBe(200);
       const finalCount = await DefaultAppSettings.countDocuments();
       expect(finalCount).toBe(1);
-      expect(response.body.data.settings.defaultMaxRps).toBe(
-        updates.defaultMaxRps
-      );
+      expect(response.body.settings.defaultMaxRps).toBe(updates.defaultMaxRps);
     });
 
     it("should fail if defaultMaxRps is missing (400)", async () => {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 // import { IUser } from "../models/user.model"; // Commented out as IUser is no longer used
-import { IApp } from '../models/app.model'; // Added IApp import
+import { IApp } from "../models/app.model"; // Added IApp import
 
 interface RateLimitBucket {
   tokens: number;
@@ -22,10 +22,10 @@ const buckets: Record<string, RateLimitBucket> = {};
  * 3. Uses the `app.apiKey` as a unique key for the rate limit bucket.
  * 4. Retrieves or creates a token bucket for the app, using `app.maxRps`.
  * 5. Refills tokens based on elapsed time and `app.maxRps`.
- * 6. If tokens are available, consumes one and sets rate limit headers (`X-RateLimit-Limit`, 
+ * 6. If tokens are available, consumes one and sets rate limit headers (`X-RateLimit-Limit`,
  *    `X-RateLimit-Remaining`, `X-RateLimit-Reset`).
  * 7. If no tokens are available, rejects the request with a 429 status code.
- * 
+ *
  * @param req {ApiKeyRequest} Express request object, augmented with `app` property.
  * @param res {Response} Express response object.
  * @param next {NextFunction} Express next middleware function.
@@ -99,7 +99,7 @@ export const cleanupOldBuckets = () => {
   const now = Date.now();
   const maxAge = 24 * 60 * 60 * 1000; // 24 hours: Max age for a bucket before being considered stale
 
-  Object.keys(buckets).forEach((appApiKey) => { 
+  Object.keys(buckets).forEach((appApiKey) => {
     const bucket = buckets[appApiKey];
     // If the bucket hasn't been refilled in `maxAge` milliseconds, delete it.
     if (now - bucket.lastRefill > maxAge) {
@@ -109,7 +109,7 @@ export const cleanupOldBuckets = () => {
 };
 
 // Schedule the cleanup function to run every hour.
-setInterval(cleanupOldBuckets, 60 * 60 * 1000);
+export const cleanupInterval = setInterval(cleanupOldBuckets, 60 * 60 * 1000);
 
 /**
  * Retrieves the current rate limit status for a given API key.
@@ -117,7 +117,7 @@ setInterval(cleanupOldBuckets, 60 * 60 * 1000);
  * @param apiKey The API key to check the rate limit status for.
  * @returns An object with `tokensRemaining` and `lastRefill` timestamp, or null if no bucket exists.
  */
-export const getRateLimitStatus = (apiKey: string) => { 
+export const getRateLimitStatus = (apiKey: string) => {
   const bucket = buckets[apiKey];
   if (!bucket) return null;
 
@@ -125,4 +125,9 @@ export const getRateLimitStatus = (apiKey: string) => {
     tokensRemaining: Math.floor(bucket.tokens),
     lastRefill: bucket.lastRefill,
   };
+};
+
+// Export function to stop the cleanup interval (useful for tests)
+export const stopCleanupInterval = () => {
+  clearInterval(cleanupInterval);
 };

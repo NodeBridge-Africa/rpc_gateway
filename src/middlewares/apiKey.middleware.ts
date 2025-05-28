@@ -3,8 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import App, { IApp } from "../models/app.model"; // Added IApp import
 
 export type ApiKeyRequest = Request & {
-  app?: IApp; // Changed from user?: IUser
-  app?: IApp; // Changed from user?: IUser
+  app?: IApp;
   apiKey?: string;
 };
 
@@ -18,20 +17,20 @@ export type ApiKeyRequest = Request & {
  * 5. Checks if the app has exceeded its `dailyRequestsLimit`.
  * 6. If all checks pass, attaches the `app` object and `apiKey` to the request object (`req.app`, `req.apiKey`).
  * 7. Calls `next()` to pass control to the next middleware or route handler.
- * 
+ *
  * Rejects with appropriate HTTP status codes for missing key, invalid/inactive key, or exceeded daily limit.
- * @param req {ApiKeyRequest} Express request object, augmented with `app` and `apiKey` properties.
+ * @param req {AuthenticatedRequest} Express request object, augmented with `app` and `apiKey` properties.
  * @param res {Response} Express response object.
  * @param next {NextFunction} Express next middleware function.
  */
 export const apiKeyGuard = async (
-  req: ApiKeyRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // Extract API key from URL path parameter e.g., /:key/some/path
-    const key = (req as any).params?.key; // Assuming key is still from URL param like /:key/
+    const key = (req as any).params?.key;
+    const requestedChain = (req as any).params?.chain?.toLowerCase();
 
     if (!key) {
       return res.status(400).json({
@@ -39,22 +38,16 @@ export const apiKeyGuard = async (
       });
     }
 
-    // Find app by API key and increment request counter
-    const app = await App.findOneAndUpdate(
-      {
-        apiKey: key,
-        isActive: true,
-      },
-      {
-        $inc: {
-          requests: 1,
-          dailyRequests: 1,
-        },
-      },
-      {
-        new: true, // Return the updated document
-      }
-    );
+    if (!requestedChain) {
+      return res.status(400).json({
+        error: "Missing chain in URL path",
+      });
+    }
+
+    const app = await App.findOne({
+      apiKey: key,
+      isActive: true,
+    });
 
     if (!app) {
       return res.status(403).json({
@@ -62,25 +55,55 @@ export const apiKeyGuard = async (
       });
     }
 
-    // Reset daily requests if needed (ensure this method exists on IApp)
-    app.resetDailyRequestsIfNeeded();
-    await app.save(); // Save changes from resetDailyRequestsIfNeeded if any
-
-    // Check daily limits
-    if (app.dailyRequests > app.dailyRequestsLimit) {
-      return res.status(429).json({
-        error: "Daily request limit exceeded for this app",
-        // Optional: provide app.dailyRequestsLimit in the response for clarity
-        // limit: app.dailyRequestsLimit 
+    // Check if the app is configured for the requested chain
+    if (app.chainName.toLowerCase() !== requestedChain) {
+      return res.status(403).json({
+        error: `API key is not valid for chain '${requestedChain}'`,
+        expectedChain: app.chainName,
       });
     }
 
-    // Attach app to request object
-    req.app = app; // Changed from req.user
-    req.apiKey = key;
+    // Atomically increment total requests and handle daily requests based on reset status
+    const didReset = app.resetDailyRequestsIfNeeded();
 
-    // The proxy middleware will handle path rewriting.
-    // It will need to use req.app.chainName or req.app.chainId to route correctly.
+    let finalUpdatedApp;
+    if (didReset) {
+      // If reset, set dailyRequests to 1 and increment total requests
+      // We also need to save the reset lastResetDate
+      app.dailyRequests = 1;
+      app.requests += 1;
+      app.lastResetDate = new Date(); // Ensure lastResetDate is updated before save
+      await app.save();
+      finalUpdatedApp = app;
+    } else {
+      // If not reset, just increment both counters atomically
+      finalUpdatedApp = await App.findOneAndUpdate(
+        { apiKey: key, isActive: true, chainName: app.chainName },
+        { $inc: { requests: 1, dailyRequests: 1 } },
+        { new: true }
+      );
+    }
+
+    if (!finalUpdatedApp) {
+      console.error(
+        "Failed to increment app counters after successful API key and chain validation."
+      );
+      return res.status(500).json({
+        error: "Internal server error during request count update.",
+      });
+    }
+
+    if (finalUpdatedApp.dailyRequests > finalUpdatedApp.dailyRequestsLimit) {
+      return res.status(429).json({
+        error: "Daily request limit exceeded for this app",
+      });
+    }
+
+    // Attach app and apiKey to request object using 'any' to avoid complex type issues here.
+    // Downstream middlewares/handlers should assert types if they need specific properties.
+    (req as any).app = finalUpdatedApp;
+    (req as any).apiKey = key;
+
     next();
   } catch (error) {
     console.error("API Key middleware error:", error);
@@ -89,14 +112,3 @@ export const apiKeyGuard = async (
     });
   }
 };
-
-// The extractApiKey function might need adjustment if the URL structure for API calls changes.
-// For now, assuming it's still valid.
-// export const extractApiKey = (req: Request): string | null => {
-//   const pathParts = req.path.split("/");
-//   // Example: /api/v1/proxy/<chainName>/:key/rpc-path -> key is at index 4 if base is /api/v1/proxy
-//   // This needs to be robust based on the actual proxy route structure.
-//   // If the key is always at a fixed position like /:key/, then (req as any).params?.key is better.
-//   const key = (req as any).params?.key;
-//   return key || null;
-// };

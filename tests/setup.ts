@@ -14,7 +14,7 @@ export const setupTestEnvironment = async () => {
   process.env.CONSENSUS_API_URL = "http://192.168.8.229:5052";
   process.env.DEFAULT_MAX_RPS = "10";
   process.env.DEFAULT_DAILY_REQUESTS = "1000";
-
+  process.env.JWT_SECRET = "asnjafefnf";
   // Connect to the database
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(mongoUri);

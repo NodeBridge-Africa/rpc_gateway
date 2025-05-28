@@ -6,7 +6,7 @@ import {
   recordRpcMetrics,
   recordRateLimitHit,
 } from "../services/metrics.service";
-import { ProxyController } from "../controllers/proxy.controller";
+import { ProxyController, getRandomUrl } from "../controllers/proxy.controller";
 import { config } from "../config"; // Import config
 
 const router = Router();
@@ -55,7 +55,7 @@ const createRpcProxy = (
     },
     onProxyRes: (proxyRes, req: any, res) => {
       const duration = (Date.now() - req.startTime) / 1000;
-      const user = req.user;
+      const app = req.app;
       const apiKey = req.apiKey || "unknown";
 
       // Extract RPC method from request body if it's a JSON-RPC request
@@ -65,12 +65,12 @@ const createRpcProxy = (
       }
 
       // Record metrics
-      if (user) {
+      if (app) {
         recordRpcMetrics(
-          user._id.toString(),
+          app.userId.toString(),
           apiKey,
           rpcMethod,
-          `${chainName}-${endpointType}`, // Added chainName to metrics
+          endpointType, // Use endpointType directly, not with chainName
           duration
         );
       }
@@ -110,35 +110,47 @@ const rateLimitWithMetrics = (
   // Typed req, res, next
   const originalSend = res.status;
   res.status = function (statusCode: number) {
-    if (statusCode === 429 && (req as any).user && (req as any).apiKey) {
-      // Type assertion for req.user/req.apiKey
-      recordRateLimitHit((req as any).user._id.toString(), (req as any).apiKey);
+    if (statusCode === 429 && (req as any).app && (req as any).apiKey) {
+      // Type assertion for req.app/req.apiKey
+      recordRateLimitHit(
+        (req as any).app.userId.toString(),
+        (req as any).apiKey
+      );
     }
     return originalSend.call(this, statusCode);
   };
 
-  return dynamicRateLimit(req, res, next);
+  return dynamicRateLimit(req as any, res, next);
 };
 
 // Execution layer proxy routes (JSON-RPC)
 // /:chain/exec/<API_KEY>/...
 router.use(
   "/:chain/exec/:key",
-  apiKeyGuard,
+  apiKeyGuard as any,
   rateLimitWithMetrics,
   (req: Request, res: Response, next: NextFunction) => {
     const chainName = req.params.chain.toLowerCase();
     const chainConfig = config.getChainConfig(chainName);
 
-    if (!chainConfig?.executionRpcUrl) {
-      return res
-        .status(404)
-        .json({
-          error: `Execution RPC URL not configured for chain ${chainName}`,
-        });
+    if (
+      !chainConfig?.executionRpcUrl ||
+      chainConfig.executionRpcUrl.length === 0
+    ) {
+      return res.status(404).json({
+        error: `Execution RPC URL not configured for chain ${chainName}`,
+      });
     }
+
+    const selectedUrl = getRandomUrl(chainConfig.executionRpcUrl);
+    if (!selectedUrl) {
+      return res.status(500).json({
+        error: `Failed to select execution RPC URL for chain ${chainName}`,
+      });
+    }
+
     const executionProxyInstance = createRpcProxy(
-      chainConfig.executionRpcUrl,
+      selectedUrl,
       chainName,
       "execution"
     );
@@ -150,21 +162,30 @@ router.use(
 // /:chain/cons/<API_KEY>/...
 router.use(
   "/:chain/cons/:key",
-  apiKeyGuard,
+  apiKeyGuard as any,
   rateLimitWithMetrics,
   (req: Request, res: Response, next: NextFunction) => {
     const chainName = req.params.chain.toLowerCase();
     const chainConfig = config.getChainConfig(chainName);
 
-    if (!chainConfig?.consensusApiUrl) {
-      return res
-        .status(404)
-        .json({
-          error: `Consensus API URL not configured for chain ${chainName}`,
-        });
+    if (
+      !chainConfig?.consensusApiUrl ||
+      chainConfig.consensusApiUrl.length === 0
+    ) {
+      return res.status(404).json({
+        error: `Consensus API URL not configured for chain ${chainName}`,
+      });
     }
+
+    const selectedUrl = getRandomUrl(chainConfig.consensusApiUrl);
+    if (!selectedUrl) {
+      return res.status(500).json({
+        error: `Failed to select consensus API URL for chain ${chainName}`,
+      });
+    }
+
     const consensusProxyInstance = createRpcProxy(
-      chainConfig.consensusApiUrl,
+      selectedUrl,
       chainName,
       "consensus"
     );

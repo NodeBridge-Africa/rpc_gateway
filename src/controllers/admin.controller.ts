@@ -5,7 +5,6 @@ import Chain from "../models/chain.model";
 import App from "../models/app.model"; // Import App model
 import User from "../models/user.model"; // Import User model
 import { successResponse, errorResponse } from "../utils/responseHandler";
-import { adminOnly } from "../middlewares/adminOnly";
 
 // Helper function (can be a private static method or defined within the class methods if preferred)
 function extractMetric(metricsText: string, metricName: string): string {
@@ -63,18 +62,35 @@ export class AdminController {
         axios.get(`${consensusApiUrl}/eth/v1/node/syncing`),
       ];
 
-      // Conditionally add Prometheus check if URL is configured
-      if (prometheusUrl) {
-        serviceChecks.push(
-          axios.get(`${prometheusUrl}/metrics`, { timeout: 5000 })
+      // Add Prometheus checks if URLs are configured
+      let prometheusChecks: Promise<any>[] = [];
+      if (prometheusUrl && prometheusUrl.length > 0) {
+        prometheusChecks = prometheusUrl.map((url) =>
+          axios.get(`${url}/metrics`, { timeout: 5000 })
         );
+        serviceChecks.push(...prometheusChecks);
       }
 
       const results = await Promise.allSettled(serviceChecks);
-      const [execResult, consensusResult, metricsResult] = results; // metricsResult will be undefined if prometheusUrl is not set
+      const [execResult, consensusResult, ...metricsResults] = results;
+
+      // Process prometheus results
+      let prometheusNodes: any[] = [];
+      if (prometheusUrl && prometheusUrl.length > 0) {
+        prometheusNodes = metricsResults.map((result, index) => ({
+          nodeIndex: index,
+          nodeUrl: prometheusUrl[index],
+          status: result.status === "fulfilled" ? "available" : "unavailable",
+          error:
+            result.status === "rejected"
+              ? result.reason instanceof Error
+                ? result.reason.message
+                : "Unknown error"
+              : null,
+        }));
+      }
 
       const health: any = {
-        // Use 'any' for flexibility or define a stricter type
         chain: chainName,
         timestamp: new Date().toISOString(),
         execution: {
@@ -104,12 +120,17 @@ export class AdminController {
           endpoint: consensusApiUrl,
         },
         metrics: {
-          status: prometheusUrl
-            ? metricsResult?.status === "fulfilled"
-              ? "available"
-              : "unavailable"
-            : "not_configured",
-          endpoint: prometheusUrl || null,
+          status:
+            prometheusUrl && prometheusUrl.length > 0
+              ? prometheusNodes.some((n) => n.status === "available")
+                ? "available"
+                : "unavailable"
+              : "not_configured",
+          totalNodes: prometheusUrl ? prometheusUrl.length : 0,
+          availableNodes: prometheusNodes.filter(
+            (n) => n.status === "available"
+          ).length,
+          nodes: prometheusNodes,
         },
         overall: "healthy", // Will be calculated below
       };
@@ -125,17 +146,23 @@ export class AdminController {
           `Consensus check for ${chainName} failed:`,
           consensusResult.reason
         );
-      if (prometheusUrl && metricsResult?.status === "rejected")
-        console.error(
-          `Prometheus check for ${chainName} failed:`,
-          metricsResult.reason
-        );
+
+      prometheusNodes.forEach((node) => {
+        if (node.error) {
+          console.error(
+            `Prometheus check for ${chainName} at ${node.nodeUrl} failed:`,
+            node.error
+          );
+        }
+      });
 
       const unhealthyServices = [
         health.execution.status,
         health.consensus.status,
-        // Only consider metrics status if it's configured and not 'available' (i.e., 'unavailable')
-        prometheusUrl && health.metrics.status === "unavailable"
+        // Only consider metrics unhealthy if ALL prometheus nodes are unavailable
+        prometheusUrl &&
+        prometheusUrl.length > 0 &&
+        health.metrics.status === "unavailable"
           ? "unhealthy"
           : "healthy",
       ].filter((status) => status === "unhealthy").length;
@@ -143,7 +170,7 @@ export class AdminController {
       const servicesNotConfigured = [
         !executionRpcUrl,
         !consensusApiUrl,
-        !prometheusUrl && health.metrics.status === "not_configured", // Count if prometheus specifically is not configured
+        !prometheusUrl || prometheusUrl.length === 0,
       ].filter(Boolean).length;
 
       if (unhealthyServices === 0) {
@@ -187,7 +214,11 @@ export class AdminController {
 
     const chainConfig = config.getChainConfig(chainName);
 
-    if (!chainConfig || !chainConfig.prometheusUrl) {
+    if (
+      !chainConfig ||
+      !chainConfig.prometheusUrl ||
+      chainConfig.prometheusUrl.length === 0
+    ) {
       res.status(404).json({
         error: `Prometheus URL not configured for chain: ${chainName}`,
       });
@@ -197,32 +228,60 @@ export class AdminController {
     const { prometheusUrl } = chainConfig;
 
     try {
-      const metricsResponse = await axios.get(`${prometheusUrl}/metrics`, {
-        timeout: 10000,
+      // Fetch metrics from all prometheus URLs in parallel
+      const metricsPromises = prometheusUrl.map(async (url, index) => {
+        try {
+          const metricsResponse = await axios.get(`${url}/metrics`, {
+            timeout: 10000,
+          });
+          const metricsText = metricsResponse.data;
+
+          return {
+            nodeIndex: index,
+            nodeUrl: url,
+            status: "available",
+            metrics: {
+              go_runtime: {
+                gc_cycles: extractMetric(
+                  metricsText,
+                  "go_gc_cycles_total_gc_cycles_total"
+                ),
+                heap_allocs: extractMetric(
+                  metricsText,
+                  "go_gc_heap_allocs_bytes_total"
+                ),
+                goroutines: extractMetric(metricsText, "go_goroutines"),
+              },
+              sync: {
+                mutex_wait: extractMetric(
+                  metricsText,
+                  "go_sync_mutex_wait_total_seconds_total"
+                ),
+              },
+              // Add more extracted metrics as needed
+            },
+          };
+        } catch (error) {
+          console.error(`Error fetching metrics from ${url}:`, error);
+          return {
+            nodeIndex: index,
+            nodeUrl: url,
+            status: "unavailable",
+            error: error instanceof Error ? error.message : "Unknown error",
+            metrics: null,
+          };
+        }
       });
-      const metricsText = metricsResponse.data; // Renamed to avoid confusion
+
+      const nodeMetrics = await Promise.all(metricsPromises);
 
       const summary = {
         chain: chainName,
         timestamp: new Date().toISOString(),
-        go_runtime: {
-          gc_cycles: extractMetric(
-            metricsText,
-            "go_gc_cycles_total_gc_cycles_total"
-          ),
-          heap_allocs: extractMetric(
-            metricsText,
-            "go_gc_heap_allocs_bytes_total"
-          ),
-          goroutines: extractMetric(metricsText, "go_goroutines"),
-        },
-        sync: {
-          mutex_wait: extractMetric(
-            metricsText,
-            "go_sync_mutex_wait_total_seconds_total"
-          ),
-        },
-        // Add more extracted metrics as needed
+        totalNodes: prometheusUrl.length,
+        availableNodes: nodeMetrics.filter((n) => n.status === "available")
+          .length,
+        nodes: nodeMetrics,
       };
 
       res.json(summary);
@@ -423,95 +482,95 @@ export class AdminController {
     }
   }
 
-  /**
-   * Updates the rate limits (maxRps and/or dailyRequestsLimit) for a specific application.
-   * @param req Express request object. Expects `appId` in params, and
-   *            { maxRps?, dailyRequestsLimit? } in the body.
-   * @param res Express response object.
-   */
-  public async updateAppLimits(req: Request, res: Response): Promise<void> {
-    try {
-      const { appId } = req.params;
-      const { maxRps, dailyRequestsLimit } = req.body;
+  // /**
+  //  * Updates the rate limits (maxRps and/or dailyRequestsLimit) for a specific application.
+  //  * @param req Express request object. Expects `appId` in params, and
+  //  *            { maxRps?, dailyRequestsLimit? } in the body.
+  //  * @param res Express response object.
+  //  */
+  // public async updateAppLimits(req: Request, res: Response): Promise<void> {
+  //   try {
+  //     const { appId } = req.params;
+  //     const { maxRps, dailyRequestsLimit } = req.body;
 
-      // Validate presence of appId
-      if (!appId) {
-        errorResponse(res, 400, "App ID must be provided in the URL path.");
-        return;
-      }
+  //     // Validate presence of appId
+  //     if (!appId) {
+  //       errorResponse(res, 400, "App ID must be provided in the URL path.");
+  //       return;
+  //     }
 
-      // Validate that at least one limit is being provided for update
-      if (maxRps === undefined && dailyRequestsLimit === undefined) {
-        errorResponse(
-          res,
-          400,
-          "At least one limit (maxRps or dailyRequestsLimit) must be provided."
-        );
-        return;
-      }
+  //     // Validate that at least one limit is being provided for update
+  //     if (maxRps === undefined && dailyRequestsLimit === undefined) {
+  //       errorResponse(
+  //         res,
+  //         400,
+  //         "At least one limit (maxRps or dailyRequestsLimit) must be provided."
+  //       );
+  //       return;
+  //     }
 
-      const updateFields: { maxRps?: number; dailyRequestsLimit?: number } = {};
+  //     const updateFields: { maxRps?: number; dailyRequestsLimit?: number } = {};
 
-      // Validate and add maxRps to updateFields if provided
-      if (maxRps !== undefined) {
-        if (typeof maxRps !== "number" || maxRps < 0) {
-          errorResponse(
-            res,
-            400,
-            "Invalid value for maxRps. Must be a non-negative number."
-          );
-          return;
-        }
-        updateFields.maxRps = maxRps;
-      }
+  //     // Validate and add maxRps to updateFields if provided
+  //     if (maxRps !== undefined) {
+  //       if (typeof maxRps !== "number" || maxRps < 0) {
+  //         errorResponse(
+  //           res,
+  //           400,
+  //           "Invalid value for maxRps. Must be a non-negative number."
+  //         );
+  //         return;
+  //       }
+  //       updateFields.maxRps = maxRps;
+  //     }
 
-      // Validate and add dailyRequestsLimit to updateFields if provided
-      if (dailyRequestsLimit !== undefined) {
-        if (typeof dailyRequestsLimit !== "number" || dailyRequestsLimit < 0) {
-          errorResponse(
-            res,
-            400,
-            "Invalid value for dailyRequestsLimit. Must be a non-negative number."
-          );
-          return;
-        }
-        updateFields.dailyRequestsLimit = dailyRequestsLimit;
-      }
+  //     // Validate and add dailyRequestsLimit to updateFields if provided
+  //     if (dailyRequestsLimit !== undefined) {
+  //       if (typeof dailyRequestsLimit !== "number" || dailyRequestsLimit < 0) {
+  //         errorResponse(
+  //           res,
+  //           400,
+  //           "Invalid value for dailyRequestsLimit. Must be a non-negative number."
+  //         );
+  //         return;
+  //       }
+  //       updateFields.dailyRequestsLimit = dailyRequestsLimit;
+  //     }
 
-      const app = await App.findByIdAndUpdate(
-        appId,
-        { $set: updateFields },
-        { new: true, runValidators: true }
-      );
+  //     const app = await App.findByIdAndUpdate(
+  //       appId,
+  //       { $set: updateFields },
+  //       { new: true, runValidators: true }
+  //     );
 
-      if (!app) {
-        errorResponse(res, 404, {
-          message: `App with ID '${appId}' not found.`,
-        });
-        return;
-      }
+  //     if (!app) {
+  //       errorResponse(res, 404, {
+  //         message: `App with ID '${appId}' not found.`,
+  //       });
+  //       return;
+  //     }
 
-      successResponse(res, 200, {
-        message: "App limits updated successfully.",
-      });
-    } catch (error) {
-      console.error("Error updating app limits:", error);
-      if (
-        (error as any).name === "CastError" &&
-        (error as any).path === "_id"
-      ) {
-        errorResponse(res, 400, "Invalid App ID format.");
-      } else if ((error as any).name === "ValidationError") {
-        errorResponse(res, 400, "Validation error.");
-      } else {
-        errorResponse(
-          res,
-          500,
-          "Internal server error while updating app limits."
-        );
-      }
-    }
-  }
+  //     successResponse(res, 200, {
+  //       message: "App limits updated successfully.",
+  //     });
+  //   } catch (error) {
+  //     console.error("Error updating app limits:", error);
+  //     if (
+  //       (error as any).name === "CastError" &&
+  //       (error as any).path === "_id"
+  //     ) {
+  //       errorResponse(res, 400, "Invalid App ID format.");
+  //     } else if ((error as any).name === "ValidationError") {
+  //       errorResponse(res, 400, "Validation error.");
+  //     } else {
+  //       errorResponse(
+  //         res,
+  //         500,
+  //         "Internal server error while updating app limits."
+  //       );
+  //     }
+  //   }
+  // }
 
   /**
    * Updates details for a specific application.

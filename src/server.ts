@@ -6,6 +6,8 @@ import database from "./config/database";
 import authRoutes from "./routes/auth.routes";
 import proxyRoutes from "./routes/proxy.routes";
 import adminRoutes from "./routes/admin.routes";
+import appRoutes from "./routes/app.routes";
+import defaultAppSettingsRoutes from "./routes/defaultAppSettings.routes";
 import {
   metricsMiddleware,
   getMetrics,
@@ -51,24 +53,38 @@ async function startServer() {
       res.json({
         name: "NodeBridge RPC Gateway",
         version: "1.0.0",
-        description: "Multi-tenant RPC gateway for Sepolia node access",
+        description: "Multi-tenant RPC gateway for node access",
         endpoints: {
+          apiInfo: "GET /",
+          healthCheck: "GET /health",
+          metrics: "GET /metrics",
           auth: {
             register: "POST /auth/register",
             login: "POST /auth/login",
             account: "GET /auth/account",
-            usage: "GET /auth/usage",
-            regenerateApiKey: "POST /auth/regenerate-api-key",
           },
-          rpc: {
-            execution: "ALL /exec/<API_KEY>/*",
-            consensus: "ALL /cons/<API_KEY>/*",
+          rpcProxy: {
+            execution: "ALL /:chain/exec/:apiKey/*",
+            consensus: "ALL /:chain/cons/:apiKey/*",
+            health: "GET /health/:chain",
           },
-          monitoring: {
-            health: "GET /health",
-            metrics: "GET /metrics",
-            nodeHealth: "GET /admin/node-health",
-            nodeMetrics: "GET /admin/node-metrics",
+          apps: {
+            create: "POST /api/v1/apps",
+            list: "GET /api/v1/apps",
+          },
+          admin: {
+            nodeHealth: "GET /admin/node-health/:chain",
+            nodeMetrics: "GET /admin/node-metrics/:chain",
+            addChain: "POST /admin/chains",
+            listChains: "GET /admin/chains",
+            updateChain: "PUT /admin/chains/:chainIdToUpdate",
+            deleteChain: "DELETE /admin/chains/:chainIdToDelete",
+            updateApp: "PATCH /admin/apps/:appId",
+            updateUser: "PATCH /admin/users/:userId",
+          },
+          defaultAppSettings: {
+            get: "GET /api/v1/admin/settings/app-defaults",
+            update: "PUT /api/v1/admin/settings/app-defaults",
           },
         },
         documentation: "https://github.com/your-repo/nodebridge-rpc-gateway",
@@ -105,7 +121,9 @@ async function startServer() {
     // Routes
     app.use("/auth", authRoutes);
     app.use("/admin", adminRoutes);
-    app.use("/", proxyRoutes); // Proxy routes handle /exec and /cons
+    app.use("/", proxyRoutes); // Proxy routes handle /:chain/exec and /:chain/cons
+    app.use("/api/v1/apps", appRoutes);
+    app.use("/api/v1/admin/settings/app-defaults", defaultAppSettingsRoutes);
 
     // Metrics endpoint for Prometheus
     app.get("/metrics", getMetrics);
@@ -116,13 +134,27 @@ async function startServer() {
         error: "Endpoint not found",
         message: `The endpoint ${req.method} ${req.originalUrl} was not found`,
         availableEndpoints: [
+          "GET /",
+          "GET /health",
+          "GET /metrics",
           "POST /auth/register",
           "POST /auth/login",
           "GET /auth/account",
-          "ALL /exec/<API_KEY>/*",
-          "ALL /cons/<API_KEY>/*",
-          "GET /health",
-          "GET /metrics",
+          "ALL /:chain/exec/:apiKey/*",
+          "ALL /:chain/cons/:apiKey/*",
+          "GET /health/:chain",
+          "POST /api/v1/apps",
+          "GET /api/v1/apps",
+          "GET /admin/node-health/:chain",
+          "GET /admin/node-metrics/:chain",
+          "POST /admin/chains",
+          "GET /admin/chains",
+          "PUT /admin/chains/:chainIdToUpdate",
+          "DELETE /admin/chains/:chainIdToDelete",
+          "PATCH /admin/apps/:appId",
+          "PATCH /admin/users/:userId",
+          "GET /api/v1/admin/settings/app-defaults",
+          "PUT /api/v1/admin/settings/app-defaults",
         ],
       });
     });

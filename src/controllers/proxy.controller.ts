@@ -41,11 +41,9 @@ export class ProxyController {
       (!executionRpcUrls || executionRpcUrls.length === 0) &&
       (!consensusApiUrls || consensusApiUrls.length === 0)
     ) {
-      res
-        .status(404)
-        .json({
-          error: `No RPC/API URLs configured for chain '${chainName}'.`,
-        });
+      res.status(404).json({
+        error: `No RPC/API URLs configured for chain '${chainName}'.`,
+      });
       return;
     }
 
@@ -69,7 +67,6 @@ export class ProxyController {
             params: [],
             id: 1,
           }),
-          timeout: 5000, // Add timeout
         });
         healthChecks.execution.status = response.ok ? "healthy" : "unhealthy";
       } catch (error) {
@@ -91,8 +88,7 @@ export class ProxyController {
       };
       try {
         const response = await fetch(
-          `${selectedConsensusUrl}/eth/v1/node/health`,
-          { timeout: 5000 }
+          `${selectedConsensusUrl}/eth/v1/node/health`
         ); // Add timeout & use selected URL
         healthChecks.consensus.status = response.ok ? "healthy" : "unhealthy";
       } catch (error) {

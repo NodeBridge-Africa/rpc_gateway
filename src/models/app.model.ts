@@ -21,7 +21,7 @@ export interface IApp extends Document {
   updatedAt: Date;
 
   // Method to reset daily requests
-  resetDailyRequestsIfNeeded(): void;
+  resetDailyRequestsIfNeeded(): boolean;
   // Method to generate a new API key (can be static or instance)
   // generateNewApiKey(): string; // Or consider making this a static method or utility
 }
@@ -30,7 +30,12 @@ const AppSchema = new Schema<IApp>(
   {
     name: { type: String, required: true },
     description: { type: String },
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
     apiKey: {
       type: String,
       default: () => uuid(), // Use a function to ensure fresh UUID on each new doc
@@ -62,18 +67,19 @@ const AppSchema = new Schema<IApp>(
 );
 
 // Method to reset daily requests
-AppSchema.methods.resetDailyRequestsIfNeeded = function () {
+AppSchema.methods.resetDailyRequestsIfNeeded = function (this: IApp): boolean {
   const now = new Date();
-  const lastReset = new Date(this.lastResetDate);
-
+  // Check if lastResetDate is null/undefined or if the date is different from today
   if (
-    now.getDate() !== lastReset.getDate() ||
-    now.getMonth() !== lastReset.getMonth() ||
-    now.getFullYear() !== lastReset.getFullYear()
+    !this.lastResetDate ||
+    this.lastResetDate.toDateString() !== now.toDateString()
   ) {
     this.dailyRequests = 0;
     this.lastResetDate = now;
+    // console.log(`App ${this.name}: Daily requests reset to 0 for ${now.toDateString()}`);
+    return true; // Reset occurred
   }
+  return false; // No reset occurred
 };
 
 // Optional: If you want a method on the instance to regenerate a key (though less common for apps)
