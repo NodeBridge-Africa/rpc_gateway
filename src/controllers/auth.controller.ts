@@ -27,7 +27,7 @@ export class AuthController {
         return;
       }
 
-      const user = await User.create({ email, password, isAdmin: true });
+      const user = await User.create({ email, password });
 
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, {
         expiresIn: "30d",
