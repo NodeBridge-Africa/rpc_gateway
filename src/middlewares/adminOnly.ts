@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
+import { errorResponse } from "../utils/responseHandler";
 
 export function adminOnly(req: Request, res: Response, next: NextFunction) {
-  if (!req.user || !req.user.isAdmin) {
-    return res.status(401).json("Unauthorized: Admin access required.");
+  if (!req.user || !req.user.isActive) {
+    return errorResponse(res, 403, "Access denied. Admins only.");
   }
   next();
 }

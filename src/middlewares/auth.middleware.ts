@@ -1,23 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import User from "../models/user.model";
+import { errorResponse } from "../utils/responseHandler";
 
-export type AuthRequest = Request & {
-  userId?: string;
-  user?: any;
-};
-
-export const auth = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
+export const auth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        error: "Access denied. No valid token provided.",
-      });
+      return errorResponse(
+        res,
+        401,
+        "Authorization header missing or invalid."
+      );
     }
 
     const token = authHeader.slice(7); // Remove 'Bearer ' prefix
@@ -27,19 +22,22 @@ export const auth = async (
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return errorResponse(res, 401, "User not found.");
+    }
     req.userId = decoded.id;
+    req.user = user; // Attach user to request for further use
 
     next();
   } catch (error) {
-    console.error("Auth middleware error:", error);
-    res.status(401).json({
-      error: "Invalid token.",
-    });
+    console.error("Authentication error:", error);
+    return errorResponse(res, 401, "Invalid token or authentication failed.");
   }
 };
 
 export const optionalAuth = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -57,7 +55,12 @@ export const optionalAuth = async (
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return errorResponse(res, 401, "User not found.");
+    }
     req.userId = decoded.id;
+    req.user = user; // Attach user to request for further use
 
     next();
   } catch (error) {

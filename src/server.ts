@@ -7,7 +7,6 @@ import authRoutes from "./routes/auth.routes";
 import proxyRoutes from "./routes/proxy.routes";
 import adminRoutes from "./routes/admin.routes";
 import appRoutes from "./routes/app.routes";
-import defaultAppSettingsRoutes from "./routes/defaultAppSettings.routes";
 import {
   metricsMiddleware,
   getMetrics,
@@ -35,7 +34,7 @@ async function startServer() {
       cors({
         origin:
           process.env.NODE_ENV === "production"
-            ? [process.env.FRONTEND_URL || "https://yourdomain.com"]
+            ? [process.env.FRONTEND_URL || "http://localhost:3000"]
             : ["http://localhost:3000", "http://127.0.0.1:3000"],
         credentials: true,
       })
@@ -62,6 +61,10 @@ async function startServer() {
             register: "POST /auth/register",
             login: "POST /auth/login",
             account: "GET /auth/account",
+            me: "GET /auth/me",
+            updatePassword: "PATCH /auth/password",
+            updateEmail: "PATCH /auth/email",
+            exportData: "GET /auth/export",
           },
           rpcProxy: {
             execution: "ALL /:chain/exec/:apiKey/*",
@@ -69,22 +72,27 @@ async function startServer() {
             health: "GET /health/:chain",
           },
           apps: {
-            create: "POST /api/v1/apps",
-            list: "GET /api/v1/apps",
+            create: "POST /apps",
+            list: "GET /apps",
+            dashboardStats: "GET /apps/dashboard/stats",
+            allAppsUsage: "GET /apps/usage/all",
+            getApp: "GET /apps/:appId",
+            updateApp: "PATCH /apps/:appId",
+            deleteApp: "DELETE /apps/:appId",
+            regenerateApiKey: "POST /apps/:appId/regenerate-key",
+            appUsage: "GET /apps/:appId/usage",
           },
           admin: {
             nodeHealth: "GET /admin/node-health/:chain",
             nodeMetrics: "GET /admin/node-metrics/:chain",
             addChain: "POST /admin/chains",
             listChains: "GET /admin/chains",
-            updateChain: "PUT /admin/chains/:chainIdToUpdate",
+            updateChain: "PATCH /admin/chains/:chainIdToUpdate",
             deleteChain: "DELETE /admin/chains/:chainIdToDelete",
             updateApp: "PATCH /admin/apps/:appId",
             updateUser: "PATCH /admin/users/:userId",
-          },
-          defaultAppSettings: {
-            get: "GET /api/v1/admin/settings/app-defaults",
-            update: "PUT /api/v1/admin/settings/app-defaults",
+            get: "GET /admin/default-app-settings",
+            update: "PATCH /admin/default-app-settings",
           },
         },
         documentation: "https://github.com/your-repo/nodebridge-rpc-gateway",
@@ -122,8 +130,7 @@ async function startServer() {
     app.use("/auth", authRoutes);
     app.use("/admin", adminRoutes);
     app.use("/", proxyRoutes); // Proxy routes handle /:chain/exec and /:chain/cons
-    app.use("/api/v1/apps", appRoutes);
-    app.use("/api/v1/admin/settings/app-defaults", defaultAppSettingsRoutes);
+    app.use("/apps", appRoutes);
 
     // Metrics endpoint for Prometheus
     app.get("/metrics", getMetrics);
@@ -140,21 +147,32 @@ async function startServer() {
           "POST /auth/register",
           "POST /auth/login",
           "GET /auth/account",
+          "GET /auth/me",
+          "PATCH /auth/password",
+          "PATCH /auth/email",
+          "GET /auth/export",
           "ALL /:chain/exec/:apiKey/*",
           "ALL /:chain/cons/:apiKey/*",
           "GET /health/:chain",
-          "POST /api/v1/apps",
-          "GET /api/v1/apps",
+          "POST /apps",
+          "GET /apps",
+          "GET /apps/dashboard/stats",
+          "GET /apps/usage/all",
+          "GET /apps/:appId",
+          "PATCH /apps/:appId",
+          "DELETE /apps/:appId",
+          "POST /apps/:appId/regenerate-key",
+          "GET /apps/:appId/usage",
           "GET /admin/node-health/:chain",
           "GET /admin/node-metrics/:chain",
           "POST /admin/chains",
           "GET /admin/chains",
-          "PUT /admin/chains/:chainIdToUpdate",
+          "PATCH /admin/chains/:chainIdToUpdate",
           "DELETE /admin/chains/:chainIdToDelete",
           "PATCH /admin/apps/:appId",
           "PATCH /admin/users/:userId",
-          "GET /api/v1/admin/settings/app-defaults",
-          "PUT /api/v1/admin/settings/app-defaults",
+          "GET /admin/default-app-settings",
+          "PATCH /admin/default-app-settings",
         ],
       });
     });
