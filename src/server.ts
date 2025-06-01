@@ -29,20 +29,12 @@ async function startServer() {
       })
     );
 
-    // CORS configuration
-    app.use(
-      cors({
-        origin:
-          process.env.NODE_ENV === "production"
-            ? [process.env.FRONTEND_URL || "*"]
-            : ["*"],
-        credentials: true,
-      })
-    );
-
     // Body parsing middleware
     app.use(express.json({ limit: "10mb" }));
     app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+    // CORS configuration
+    app.use(cors({ origin: true, credentials: true }));
 
     // Metrics middleware (applied to all routes)
     app.use(metricsMiddleware);
