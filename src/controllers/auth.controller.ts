@@ -233,15 +233,13 @@ export class AuthController {
 
       successResponse(res, 200, {
         success: true,
+        message: "Email updated successfully",
         data: {
-          message: "Email updated successfully",
-          user: {
-            id: user._id,
-            email: user.email,
-            isActive: user.isActive,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt,
-          },
+          id: user._id,
+          email: user.email,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
         },
       });
     } catch (error) {
