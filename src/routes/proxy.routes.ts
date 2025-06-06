@@ -47,6 +47,7 @@ const createRpcProxy = (
           req.method
         } ${req.url} - User: ${
           // Added chainName to log
+          // user will difinatly be empty because there is not route
           req.user?.email || "unknown"
         }`
       );

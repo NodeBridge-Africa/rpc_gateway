@@ -4,6 +4,7 @@ import { config } from "../config"; // Import the new config
 import Chain from "../models/chain.model";
 import App from "../models/app.model"; // Import App model
 import User from "../models/user.model"; // Import User model
+import DefaultAppSettings from "../models/defaultAppSettings.model"; // Import DefaultAppSettings model
 import { successResponse, errorResponse } from "../utils/responseHandler";
 
 // Helper function (can be a private static method or defined within the class methods if preferred)
@@ -50,29 +51,113 @@ export class AdminController {
     const { executionRpcUrl, consensusApiUrl, prometheusUrl } = chainConfig;
 
     try {
-      const serviceChecks = [
-        // Check execution layer
-        axios.post(`${executionRpcUrl}/`, {
-          jsonrpc: "2.0",
-          method: "eth_syncing",
-          params: [],
-          id: 1,
-        }),
-        // Check consensus layer
-        axios.get(`${consensusApiUrl}/eth/v1/node/syncing`),
-      ];
+      const serviceChecks: Promise<any>[] = [];
+
+      // Check execution layer nodes
+      let executionChecks: Promise<any>[] = [];
+      if (executionRpcUrl && executionRpcUrl.length > 0) {
+        executionChecks = executionRpcUrl.map((url) =>
+          axios.post(
+            `${url}/`,
+            {
+              jsonrpc: "2.0",
+              method: "eth_syncing",
+              params: [],
+              id: 1,
+            },
+            { timeout: 50000 }
+          )
+        );
+        serviceChecks.push(...executionChecks);
+      }
+
+      // Check consensus layer nodes
+      let consensusChecks: Promise<any>[] = [];
+      if (consensusApiUrl && consensusApiUrl.length > 0) {
+        consensusChecks = consensusApiUrl.map((url) =>
+          axios.get(`${url}/eth/v1/node/syncing`, { timeout: 50000 })
+        );
+        serviceChecks.push(...consensusChecks);
+      }
 
       // Add Prometheus checks if URLs are configured
       let prometheusChecks: Promise<any>[] = [];
       if (prometheusUrl && prometheusUrl.length > 0) {
         prometheusChecks = prometheusUrl.map((url) =>
-          axios.get(`${url}/metrics`, { timeout: 5000 })
+          axios.get(`${url}/metrics`, { timeout: 50000 })
         );
         serviceChecks.push(...prometheusChecks);
       }
 
       const results = await Promise.allSettled(serviceChecks);
-      const [execResult, consensusResult, ...metricsResults] = results;
+
+      // Split results by service type
+      let currentIndex = 0;
+      const executionResults = results.slice(
+        currentIndex,
+        currentIndex + executionChecks.length
+      );
+      currentIndex += executionChecks.length;
+
+      const consensusResults = results.slice(
+        currentIndex,
+        currentIndex + consensusChecks.length
+      );
+      currentIndex += consensusChecks.length;
+
+      const metricsResults = results.slice(
+        currentIndex,
+        currentIndex + prometheusChecks.length
+      );
+
+      // Process execution layer results
+      let executionNodes: any[] = [];
+      if (executionRpcUrl && executionRpcUrl.length > 0) {
+        executionNodes = executionResults.map((result, index) => ({
+          nodeIndex: index,
+          nodeUrl: executionRpcUrl[index],
+          status: result.status === "fulfilled" ? "available" : "unavailable",
+          syncing:
+            result.status === "fulfilled" &&
+            result.value.data.result !== undefined
+              ? result.value.data.result === false
+                ? false
+                : result.value.data.result
+              : "unknown",
+          error:
+            result.status === "rejected"
+              ? result.reason instanceof Error
+                ? result.reason.message
+                : "Unknown error"
+              : null,
+        }));
+      }
+
+      // Process consensus layer results
+      let consensusNodes: any[] = [];
+      if (consensusApiUrl && consensusApiUrl.length > 0) {
+        consensusNodes = consensusResults.map((result, index) => ({
+          nodeIndex: index,
+          nodeUrl: consensusApiUrl[index],
+          status: result.status === "fulfilled" ? "available" : "unavailable",
+          syncing:
+            result.status === "fulfilled" &&
+            result.value.data?.data?.is_syncing !== undefined
+              ? result.value.data.data.is_syncing
+              : "unknown",
+          head_slot:
+            result.status === "fulfilled" &&
+            result.value.data?.data?.head_slot !== undefined
+              ? result.value.data.data.head_slot
+              : "unknown",
+          error:
+            result.status === "rejected"
+              ? result.reason instanceof Error
+                ? result.reason.message
+                : "Unknown error"
+              : null,
+        }));
+      }
 
       // Process prometheus results
       let prometheusNodes: any[] = [];
@@ -94,30 +179,28 @@ export class AdminController {
         chain: chainName,
         timestamp: new Date().toISOString(),
         execution: {
-          status: execResult.status === "fulfilled" ? "healthy" : "unhealthy",
-          syncing:
-            execResult.status === "fulfilled" &&
-            execResult.value.data.result !== undefined
-              ? execResult.value.data.result === false
-                ? false
-                : execResult.value.data.result
-              : "unknown",
-          endpoint: executionRpcUrl,
+          status:
+            executionRpcUrl && executionRpcUrl.length > 0
+              ? executionNodes.some((n) => n.status === "available")
+                ? "healthy"
+                : "unhealthy"
+              : "not_configured",
+          totalNodes: executionRpcUrl ? executionRpcUrl.length : 0,
+          availableNodes: executionNodes.filter((n) => n.status === "available")
+            .length,
+          nodes: executionNodes,
         },
         consensus: {
           status:
-            consensusResult.status === "fulfilled" ? "healthy" : "unhealthy",
-          syncing:
-            consensusResult.status === "fulfilled" &&
-            consensusResult.value.data?.data?.is_syncing !== undefined
-              ? consensusResult.value.data.data.is_syncing
-              : "unknown",
-          head_slot:
-            consensusResult.status === "fulfilled" &&
-            consensusResult.value.data?.data?.head_slot !== undefined
-              ? consensusResult.value.data.data.head_slot
-              : "unknown",
-          endpoint: consensusApiUrl,
+            consensusApiUrl && consensusApiUrl.length > 0
+              ? consensusNodes.some((n) => n.status === "available")
+                ? "healthy"
+                : "unhealthy"
+              : "not_configured",
+          totalNodes: consensusApiUrl ? consensusApiUrl.length : 0,
+          availableNodes: consensusNodes.filter((n) => n.status === "available")
+            .length,
+          nodes: consensusNodes,
         },
         metrics: {
           status:
@@ -135,17 +218,24 @@ export class AdminController {
         overall: "healthy", // Will be calculated below
       };
 
-      // Detailed error logging for failed promises
-      if (execResult.status === "rejected")
-        console.error(
-          `Execution check for ${chainName} failed:`,
-          execResult.reason
-        );
-      if (consensusResult.status === "rejected")
-        console.error(
-          `Consensus check for ${chainName} failed:`,
-          consensusResult.reason
-        );
+      // Detailed error logging for failed nodes
+      executionNodes.forEach((node) => {
+        if (node.error) {
+          console.error(
+            `Execution check for ${chainName} at ${node.nodeUrl} failed:`,
+            node.error
+          );
+        }
+      });
+
+      consensusNodes.forEach((node) => {
+        if (node.error) {
+          console.error(
+            `Consensus check for ${chainName} at ${node.nodeUrl} failed:`,
+            node.error
+          );
+        }
+      });
 
       prometheusNodes.forEach((node) => {
         if (node.error) {
@@ -168,8 +258,8 @@ export class AdminController {
       ].filter((status) => status === "unhealthy").length;
 
       const servicesNotConfigured = [
-        !executionRpcUrl,
-        !consensusApiUrl,
+        !executionRpcUrl || executionRpcUrl.length === 0,
+        !consensusApiUrl || consensusApiUrl.length === 0,
         !prometheusUrl || prometheusUrl.length === 0,
       ].filter(Boolean).length;
 
@@ -186,15 +276,21 @@ export class AdminController {
       }
 
       // If all critical services are not configured, status might be misleading
-      if (!executionRpcUrl && !consensusApiUrl) {
+      if (
+        (!executionRpcUrl || executionRpcUrl.length === 0) &&
+        (!consensusApiUrl || consensusApiUrl.length === 0)
+      ) {
         health.overall = "not_configured";
       }
 
-      res.json(health);
+      successResponse(res, 200, {
+        success: true,
+        data: health,
+      });
     } catch (error) {
       console.error(`Error in getNodeHealth for chain ${chainName}:`, error);
-      res.status(500).json({
-        error: "Failed to check node health",
+      errorResponse(res, 500, {
+        error: "Failed to fetch node health",
         details: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -284,10 +380,13 @@ export class AdminController {
         nodes: nodeMetrics,
       };
 
-      res.json(summary);
+      successResponse(res, 200, {
+        success: true,
+        data: summary,
+      });
     } catch (error) {
       console.error(`Error in getNodeMetrics for chain ${chainName}:`, error);
-      res.status(500).json({
+      errorResponse(res, 500, {
         error: "Failed to fetch node metrics",
         details: error instanceof Error ? error.message : "Unknown error",
       });
@@ -329,7 +428,11 @@ export class AdminController {
       });
 
       await newChain.save();
-      successResponse(res, 201, { message: "Chain added successfully." });
+      successResponse(res, 201, {
+        message: "Chain added successfully.",
+        success: true,
+        data: newChain,
+      });
     } catch (error) {
       console.error("Error adding chain:", error);
       errorResponse(res, 500, {
@@ -345,8 +448,11 @@ export class AdminController {
    */
   public async listChains(req: Request, res: Response): Promise<void> {
     try {
-      const chains = await Chain.find();
-      successResponse(res, 200, { message: "Chains retrieved successfully." });
+      const chains = await Chain.find().sort({ createdAt: -1 });
+      successResponse(res, 200, {
+        success: true,
+        data: chains,
+      });
     } catch (error) {
       console.error("Error listing chains:", error);
       errorResponse(res, 500, {
@@ -435,7 +541,11 @@ export class AdminController {
       }
 
       await chain.save();
-      successResponse(res, 200, { message: "Chain updated successfully." });
+      successResponse(res, 200, {
+        message: "Chain updated successfully.",
+        success: true,
+        data: chain,
+      });
     } catch (error) {
       console.error("Error updating chain:", error);
       errorResponse(res, 500, {
@@ -473,7 +583,10 @@ export class AdminController {
         return;
       }
 
-      successResponse(res, 200, { message: "Chain deleted successfully." });
+      successResponse(res, 200, {
+        message: "Chain deleted successfully.",
+        success: true,
+      });
     } catch (error) {
       console.error("Error deleting chain:", error);
       errorResponse(res, 500, {
@@ -481,96 +594,6 @@ export class AdminController {
       });
     }
   }
-
-  // /**
-  //  * Updates the rate limits (maxRps and/or dailyRequestsLimit) for a specific application.
-  //  * @param req Express request object. Expects `appId` in params, and
-  //  *            { maxRps?, dailyRequestsLimit? } in the body.
-  //  * @param res Express response object.
-  //  */
-  // public async updateAppLimits(req: Request, res: Response): Promise<void> {
-  //   try {
-  //     const { appId } = req.params;
-  //     const { maxRps, dailyRequestsLimit } = req.body;
-
-  //     // Validate presence of appId
-  //     if (!appId) {
-  //       errorResponse(res, 400, "App ID must be provided in the URL path.");
-  //       return;
-  //     }
-
-  //     // Validate that at least one limit is being provided for update
-  //     if (maxRps === undefined && dailyRequestsLimit === undefined) {
-  //       errorResponse(
-  //         res,
-  //         400,
-  //         "At least one limit (maxRps or dailyRequestsLimit) must be provided."
-  //       );
-  //       return;
-  //     }
-
-  //     const updateFields: { maxRps?: number; dailyRequestsLimit?: number } = {};
-
-  //     // Validate and add maxRps to updateFields if provided
-  //     if (maxRps !== undefined) {
-  //       if (typeof maxRps !== "number" || maxRps < 0) {
-  //         errorResponse(
-  //           res,
-  //           400,
-  //           "Invalid value for maxRps. Must be a non-negative number."
-  //         );
-  //         return;
-  //       }
-  //       updateFields.maxRps = maxRps;
-  //     }
-
-  //     // Validate and add dailyRequestsLimit to updateFields if provided
-  //     if (dailyRequestsLimit !== undefined) {
-  //       if (typeof dailyRequestsLimit !== "number" || dailyRequestsLimit < 0) {
-  //         errorResponse(
-  //           res,
-  //           400,
-  //           "Invalid value for dailyRequestsLimit. Must be a non-negative number."
-  //         );
-  //         return;
-  //       }
-  //       updateFields.dailyRequestsLimit = dailyRequestsLimit;
-  //     }
-
-  //     const app = await App.findByIdAndUpdate(
-  //       appId,
-  //       { $set: updateFields },
-  //       { new: true, runValidators: true }
-  //     );
-
-  //     if (!app) {
-  //       errorResponse(res, 404, {
-  //         message: `App with ID '${appId}' not found.`,
-  //       });
-  //       return;
-  //     }
-
-  //     successResponse(res, 200, {
-  //       message: "App limits updated successfully.",
-  //     });
-  //   } catch (error) {
-  //     console.error("Error updating app limits:", error);
-  //     if (
-  //       (error as any).name === "CastError" &&
-  //       (error as any).path === "_id"
-  //     ) {
-  //       errorResponse(res, 400, "Invalid App ID format.");
-  //     } else if ((error as any).name === "ValidationError") {
-  //       errorResponse(res, 400, "Validation error.");
-  //     } else {
-  //       errorResponse(
-  //         res,
-  //         500,
-  //         "Internal server error while updating app limits."
-  //       );
-  //     }
-  //   }
-  // }
 
   /**
    * Updates details for a specific application.
@@ -639,6 +662,8 @@ export class AdminController {
 
       successResponse(res, 200, {
         message: "App details updated successfully.",
+        success: true,
+        data: app.toObject(), // Convert Mongoose document to plain object
       });
     } catch (error) {
       console.error("Error updating app details:", error);
@@ -718,6 +743,8 @@ export class AdminController {
 
         successResponse(res, 200, {
           message: "User details updated successfully.",
+          success: true,
+          data: userObject,
         });
       } else {
         // No password update, can use findByIdAndUpdate
@@ -738,6 +765,8 @@ export class AdminController {
 
         successResponse(res, 200, {
           message: "User details updated successfully.",
+          success: true,
+          data: userObject,
         });
       }
     } catch (error) {
@@ -763,6 +792,164 @@ export class AdminController {
           "Internal server error while updating user details."
         );
       }
+    }
+  }
+
+  /**
+   * Get all users with pagination
+   * @param req Express request object, expects optional query params: page, limit
+   * @param res Express response object
+   */
+  public async getAllUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const skip = (page - 1) * limit;
+
+      const users = await User.find({}, { password: 0 }) // Exclude password field
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const total = await User.countDocuments();
+
+      successResponse(res, 200, {
+        success: true,
+        data: {
+          users: users,
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      errorResponse(res, 500, "Internal server error while fetching users.");
+    }
+  }
+
+  /**
+   * Get all apps with pagination
+   * @param req Express request object, expects optional query params: page, limit, userId
+   * @param res Express response object
+   */
+  public async getAllApps(req: Request, res: Response): Promise<void> {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const userId = req.query.userId as string;
+      const skip = (page - 1) * limit;
+
+      // Build filter object
+      const filter: any = {};
+      if (userId) {
+        filter.userId = userId;
+      }
+
+      const apps = await App.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const total = await App.countDocuments(filter);
+
+      successResponse(res, 200, {
+        success: true,
+        data: {
+          apps: apps,
+          total: total,
+          page: page,
+          limit: limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching apps:", error);
+      errorResponse(res, 500, "Internal server error while fetching apps.");
+    }
+  }
+
+  /**
+   * Get default app settings
+   * @param req Express request object
+   * @param res Express response object
+   */
+  public async getDefaultAppSettings(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      let settings = await DefaultAppSettings.findOne();
+
+      // If no settings exist, create default ones
+      if (!settings) {
+        settings = await DefaultAppSettings.create({
+          maxRps: process.env.DEFAULT_MAX_RPS || 10,
+          dailyRequestsLimit: process.env.DEFAULT_DAILY_REQUESTS || 10000,
+        });
+      }
+
+      successResponse(res, 200, {
+        succuss: true,
+        data: settings,
+      });
+    } catch (error) {
+      console.error("Error fetching default app settings:", error);
+      errorResponse(
+        res,
+        500,
+        "Internal server error while fetching default app settings."
+      );
+    }
+  }
+
+  /**
+   * Update default app settings
+   * @param req Express request object, expects { maxRps?, dailyRequestsLimit? } in body
+   * @param res Express response object
+   */
+  public async updateDefaultAppSettings(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { maxRps, dailyRequestsLimit } = req.body;
+
+      if (maxRps === undefined && dailyRequestsLimit === undefined) {
+        errorResponse(
+          res,
+          400,
+          "At least one field (maxRps or dailyRequestsLimit) must be provided."
+        );
+        return;
+      }
+
+      const updateData: {
+        maxRps?: number;
+        dailyRequestsLimit?: number;
+      } = {};
+      if (maxRps !== undefined) updateData.maxRps = maxRps;
+      if (dailyRequestsLimit !== undefined)
+        updateData.dailyRequestsLimit = dailyRequestsLimit;
+
+      let settings = await DefaultAppSettings.findOneAndUpdate(
+        {},
+        { $set: updateData },
+        { new: true, upsert: true, runValidators: true }
+      );
+
+      successResponse(res, 200, {
+        success: true,
+        data: settings,
+      });
+    } catch (error) {
+      console.error("Error updating default app settings:", error);
+      errorResponse(
+        res,
+        500,
+        "Internal server error while updating default app settings."
+      );
     }
   }
 }

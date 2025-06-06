@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { config } from "../config"; // Import config
+import { errorResponse } from "../utils/responseHandler";
 
 // 'fetch' is globally available in Node.js 18+ environments.
 // If using an older Node version or a specific fetch polyfill, ensure it's properly imported/configured.
@@ -18,16 +19,16 @@ export class ProxyController {
   public async checkProxyHealth(req: Request, res: Response): Promise<void> {
     const chainName = req.params.chain?.toLowerCase();
     if (!chainName) {
-      res.status(400).json({ error: "Chain parameter is missing." });
+      errorResponse(res, 400, { error: "Chain parameter is missing." });
       return;
     }
 
     const chainConfig = config.getChainConfig(chainName);
 
     if (!chainConfig) {
-      res
-        .status(404)
-        .json({ error: `Configuration for chain '${chainName}' not found.` });
+      errorResponse(res, 404, {
+        error: `Configuration for chain '${chainName}' not found.`,
+      });
       return;
     }
 
@@ -41,7 +42,7 @@ export class ProxyController {
       (!executionRpcUrls || executionRpcUrls.length === 0) &&
       (!consensusApiUrls || consensusApiUrls.length === 0)
     ) {
-      res.status(404).json({
+      errorResponse(res, 400, {
         error: `No RPC/API URLs configured for chain '${chainName}'.`,
       });
       return;

@@ -1,9 +1,12 @@
-import { IUser } from "src/models/user";
+import { IUser } from "../../models/user.model";
 
 declare global {
-  export namespace Express {
+  namespace Express {
     interface Request {
-      user: any;
+      userId?: string;
+      user?: IUser;
     }
   }
 }
+
+export {};

@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { AdminController } from "../controllers/admin.controller";
-import { auth } from "../auth/auth"; // Assuming this is the correct admin auth middleware
 import validateRequest from "../middlewares/requestValidator";
 import { adminOnly } from "../middlewares/adminOnly";
 import { userUpdateValidationRules } from "../validators/admin.validators";
 import { appUpdateValidationRules } from "../validators/admin.validators";
+import { auth } from "../middlewares/auth.middleware";
 
 const router = Router();
 const adminController = new AdminController();
@@ -15,7 +15,7 @@ router.get(
   auth,
   adminOnly,
   adminController.getNodeHealth
-); // Added :chain
+);
 
 // Get node metrics summary
 router.get(
@@ -23,7 +23,7 @@ router.get(
   auth,
   adminOnly,
   adminController.getNodeMetrics
-); // Added :chain
+);
 
 // The extractMetric function should now be part of AdminController
 // and is no longer needed here.
@@ -32,9 +32,11 @@ router.get(
 // These routes should be protected by an admin-only authorization middleware.
 // For now, using the general 'auth' middleware. Replace with specific admin middleware if available.
 
+//getting chains should be accessible to all
+router.get("/chains", auth, adminController.listChains);
+
 router.post("/chains", auth, adminOnly, adminController.addChain);
-router.get("/chains", auth, adminOnly, adminController.listChains);
-router.put(
+router.patch(
   "/chains/:chainIdToUpdate",
   auth,
   adminOnly,
@@ -69,6 +71,30 @@ router.patch(
   userUpdateValidationRules,
   validateRequest,
   adminController.updateUserDetails
+);
+
+// --- New GET Routes ---
+
+// Route to get all users
+router.get("/users", auth, adminOnly, adminController.getAllUsers);
+
+// Route to get all apps
+router.get("/apps", auth, adminOnly, adminController.getAllApps);
+
+// Route to get default app settings
+router.get(
+  "/default-app-settings",
+  auth,
+  adminOnly,
+  adminController.getDefaultAppSettings
+);
+
+// Route to update default app settings
+router.patch(
+  "/default-app-settings",
+  auth,
+  adminOnly,
+  adminController.updateDefaultAppSettings
 );
 
 export default router;

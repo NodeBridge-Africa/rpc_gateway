@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 export interface IUser extends Document {
   email: string;
   password: string;
+  isAdmin: boolean; // admin status
   isActive: boolean; // account status
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +27,10 @@ const UserSchema = new Schema<IUser>(
       type: String,
       required: true,
       minlength: 6,
+    },
+    isAdmin: {
+      type: Boolean,
+      default: false,
     },
     isActive: {
       type: Boolean,

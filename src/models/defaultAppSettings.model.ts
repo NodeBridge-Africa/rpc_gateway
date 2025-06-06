@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document } from "mongoose";
 
 /**
  * Defines the structure for default application settings,
@@ -6,22 +6,22 @@ import { Schema, model, Document } from 'mongoose';
  */
 export interface IDefaultAppSettings extends Document {
   /** Default maximum requests per second for new apps. */
-  defaultMaxRps: number;
+  maxRps: number;
   /** Default maximum daily requests limit for new apps. */
-  defaultDailyRequestsLimit: number;
+  dailyRequestsLimit: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const DefaultAppSettingsSchema = new Schema<IDefaultAppSettings>(
   {
-    defaultMaxRps: { 
-      type: Number, 
+    maxRps: {
+      type: Number,
       required: true,
       /** Default maximum requests per second for new apps. */
     },
-    defaultDailyRequestsLimit: { 
-      type: Number, 
+    dailyRequestsLimit: {
+      type: Number,
       required: true,
       /** Default maximum daily requests limit for new apps. */
     },
@@ -40,4 +40,7 @@ const DefaultAppSettingsSchema = new Schema<IDefaultAppSettings>(
 // And then always query for { settingsId: 'global_app_settings' }
 // For now, let's keep it simple and the logic to manage a single doc will be in the controller.
 
-export default model<IDefaultAppSettings>('DefaultAppSettings', DefaultAppSettingsSchema);
+export default model<IDefaultAppSettings>(
+  "DefaultAppSettings",
+  DefaultAppSettingsSchema
+);
